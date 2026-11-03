@@ -1,0 +1,23 @@
+{
+  "frozen_at": "2026-11-03T11:45:14+00:00",
+  "spec_hash": "e923fb16dbab07106f22e014d8b4d261d2d038daf99385fb54be060a90b153cf",
+  "files": {
+    "config/kpi_spec.yaml": "3c7a014f400e8527cb7a46da844136fb0e8037cc2ce4c445bbaee311a4830e68",
+    "sql/kpi/k01_gmv.sql": "7737e3bb8cba4ef87c96d454db8c00316f4e4932951d6c11f5037c20eeaedb67",
+    "sql/kpi/k02_delivered_orders.sql": "f28dd43adce637beb496f5df0826cef4c1b7b5da3f1385085e9d2cabd103ee7f",
+    "sql/kpi/k03_aov.sql": "6649dd108f4b8168ce142271005eccf9d59ae1aa2abd5bfab5fa447187b25df3",
+    "sql/kpi/k04_freight_ratio.sql": "61611564bcd4e3aae713c92ecdcff6515c27de01e98283756866543a538974bf",
+    "sql/kpi/k05_on_time_rate.sql": "ee9838097c8b48dfc14f03bdb2c0423950f831969fc5d3165f69a3a4c8d8192c",
+    "sql/kpi/k05b_on_time_rate_all_orders.sql": "772d26dc20e64b7a7cf0cf4cf478740f5b15f2f2499681e7045b7a7a0a83d11a",
+    "sql/kpi/k06_mean_delivery_days.sql": "3960a2393a31fe79bed9871fc5ae82bbdca2cd0f67c0431b8641a91d3be5605c",
+    "sql/kpi/k07_avg_review_score.sql": "0c98e19596db39640ca224109f510b6ce7e357b2cf18ebbe0ed39aad1c2ed2fd",
+    "sql/kpi/k08_negative_review_share.sql": "764f0d9618ffeb9209c546489d6c170dc85a25aeeb1b572b5d8bb6c7ec319c0f",
+    "sql/kpi/k09_repeat_customer_rate.sql": "aa459a7c5461e8429f84e1e12fa7b710c388e8f1e3a607e85f25849d416fcbdd",
+    "sql/kpi/k10_active_customers.sql": "9d103570dfd094eac4337450fc0003fbb9f3251e3b1418c193d3ee7bc45cda0f",
+    "sql/kpi/k11_top_categories.sql": "cae265edcfc0b92c83cb34daa94c8c42289cff71d708704be3413609a2ae7790",
+    "sql/kpi/k12_top_sellers.sql": "1c7a08ba7cab912d79c395068ca7ac40bdedf0d0181c3fc638bc0b9dffeb5fc3",
+    "sql/kpi/k13_top_states.sql": "8554ff06b7a947ab205bf6bedb98cbb8cce3a646825406086a8e27049a661d06",
+    "sql/kpi/k14_monthly_gmv.sql": "e0b1b553b5e303c75dfa6a61f9905d1f721edd0e66b344704adaf8007a404cf9",
+    "sql/kpi/k15_worst_category.sql": "c7c313a4c02cf0e1bc3e71672bceb1a5a2f4ad597eac5c714709880699c60f35"
+  }
+}

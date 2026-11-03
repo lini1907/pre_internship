@@ -1,0 +1,3 @@
+# Keep LF so the SHA-256 in config/kpi_spec.lock is the same on every OS.
+* text=auto eol=lf
+*.png binary

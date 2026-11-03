@@ -1,0 +1,10 @@
+duckdb==2.0.0
+pandas==2.2.3
+pyarrow==22.0.0
+numpy==2.2.3
+PyYAML==6.0.3
+pydantic==2.11.9
+matplotlib==3.10.0
+scipy==1.16.2
+pytest==9.2.0
+ruff

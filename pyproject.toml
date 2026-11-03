@@ -1,0 +1,19 @@
+[project]
+name = "dqk"
+version = "0.1.0"
+requires-python = ">=3.11"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+markers = ["slow: runs on the real Olist data"]
+
+[tool.ruff]
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B"]

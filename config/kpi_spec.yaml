@@ -1,0 +1,169 @@
+# Machine-readable definition of the 15 KPIs (proposal 5.3, code plan 3.4).
+# Frozen at the end of week A1: any change to this file or to sql/kpi/ breaks
+# config/kpi_spec.lock, and run_experiment.py refuses to run until it is re-frozen.
+#
+# Every KPI query returns columns (item VARCHAR, value DOUBLE, rank INTEGER).
+# Scalar KPIs return one row with item = NULL. Named parameters ($window_start, ...)
+# come from `params` below.
+
+version: 1
+
+params:
+  window_start: 2017-01-01      # inclusive, on purchase_ts (decision 1)
+  window_end: 2018-09-01        # exclusive -> last month is 2018-08
+  min_reviews: 100              # K15 eligibility (decision 5)
+  unknown_label: unknown        # orphan keys and missing categories (decision 4)
+
+decisions:
+  - id: 1
+    topic: Time window
+    choice: >-
+      All KPIs use orders with purchase_ts in [2017-01-01, 2018-09-01). 2016 has 329
+      orders in three months and 2018-09/10 have 20 orders and no deliveries
+      (docs/profiling_report.md, section 4).
+  - id: 2
+    topic: Date anchor for K14
+    choice: purchase_ts, truncated to calendar month (YYYY-MM).
+  - id: 3
+    topic: K7 when an order has several reviews
+    choice: >-
+      Use the single review per order kept by staging (latest review_answer_timestamp).
+      fact_orders.review_score already holds that one value. 547 orders have more than
+      one review in raw data.
+  - id: 4
+    topic: Orphan keys in ranking KPIs
+    choice: >-
+      LEFT JOIN the dimension and label unmatched rows 'unknown'. The 'unknown' group
+      keeps its value but gets rank NULL, so it never enters a top-k list. Products
+      without a category also map to 'unknown'.
+  - id: 5
+    topic: K15 eligibility and ties
+    choice: >-
+      Only named categories with >= 100 reviewed orders in the window. Lowest mean score
+      wins; ties broken by category name ascending.
+
+populations:
+  delivered_orders: >-
+    fact_orders rows with is_delivered (status = 'delivered') and purchase_ts in the window.
+  window_orders: fact_orders rows with purchase_ts in the window, any status.
+
+kpis:
+  - id: K1
+    name: Gross merchandise value (GMV)
+    type: monetary
+    sql: kpi/k01_gmv.sql
+    population: delivered_orders
+    rule: sum of fact_order_items.price over delivered orders
+
+  - id: K2
+    name: Delivered orders
+    type: count
+    sql: kpi/k02_delivered_orders.sql
+    population: delivered_orders
+    rule: count(DISTINCT order_id)
+
+  - id: K3
+    name: Average order value (AOV)
+    type: ratio
+    sql: kpi/k03_aov.sql
+    population: delivered_orders
+    rule: K1 / K2
+
+  - id: K4
+    name: Freight ratio
+    type: ratio
+    sql: kpi/k04_freight_ratio.sql
+    population: delivered_orders
+    rule: sum(freight_value) / sum(price)
+
+  - id: K5
+    name: On-time delivery rate
+    type: rate
+    sql: kpi/k05_on_time_rate.sql
+    population: delivered orders with non-null delivered_customer_ts
+    rule: share with CAST(delivered_customer_ts AS DATE) <= estimated_delivery_date
+    alt_definitions:
+      - id: K5_all_orders
+        sql: kpi/k05b_on_time_rate_all_orders.sql
+        population: window_orders with non-null estimated_delivery_date
+        rule: undelivered orders count as not on time
+
+  - id: K6
+    name: Mean delivery time
+    type: duration
+    unit: days
+    sql: kpi/k06_mean_delivery_days.sql
+    population: delivered orders with non-null delivered_customer_ts
+    rule: mean(delivered_customer_ts - purchase_ts) in days (fractional)
+
+  - id: K7
+    name: Average review score
+    type: score
+    sql: kpi/k07_avg_review_score.sql
+    population: window_orders with non-null review_score
+    rule: mean(review_score), one review per order (decision 3)
+
+  - id: K8
+    name: Negative review share
+    type: rate
+    sql: kpi/k08_negative_review_share.sql
+    population: window_orders with non-null review_score
+    rule: share with review_score <= 2
+
+  - id: K9
+    name: Repeat customer rate
+    type: rate
+    sql: kpi/k09_repeat_customer_rate.sql
+    population: customer_unique_id with >= 1 delivered order
+    rule: share with >= 2 distinct delivered orders
+
+  - id: K10
+    name: Active customers
+    type: count
+    sql: kpi/k10_active_customers.sql
+    population: delivered_orders
+    rule: count(DISTINCT customer_unique_id)
+
+  - id: K11
+    name: Top-10 categories by GMV
+    type: ranking
+    top_k: 10
+    sql: kpi/k11_top_categories.sql
+    population: delivered_orders
+    rule: GMV per dim_product.category_en; orphan or missing -> 'unknown' (rank NULL)
+
+  - id: K12
+    name: Top-20 sellers by GMV
+    type: ranking
+    top_k: 20
+    sql: kpi/k12_top_sellers.sql
+    population: delivered_orders
+    rule: GMV per seller_id; seller_id not in dim_seller -> 'unknown' (rank NULL)
+
+  - id: K13
+    name: Top-5 customer states by GMV
+    type: ranking
+    top_k: 5
+    sql: kpi/k13_top_states.sql
+    population: delivered_orders
+    rule: >-
+      GMV per dim_customer.state; customer not in dim_customer -> 'unknown' (rank NULL).
+      dim_customer holds one state per customer_unique_id (39 ids span several states in
+      raw data; staging keeps the state of the latest order).
+
+  - id: K14
+    name: Monthly GMV series
+    type: series
+    sql: kpi/k14_monthly_gmv.sql
+    population: delivered_orders
+    rule: GMV per strftime(purchase_ts, '%Y-%m') (decision 2)
+
+  - id: K15
+    name: Worst-rated category
+    type: decision
+    sql: kpi/k15_worst_category.sql
+    population: window_orders with non-null review_score
+    rule: >-
+      Per named category, mean review_score over distinct reviewed orders containing
+      that category; keep categories with >= min_reviews orders; rank ascending by mean,
+      then name. The decision is the rank-1 item.
