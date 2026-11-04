@@ -1,0 +1,14 @@
+-- One row per order_id. Timestamps cast with TRY_CAST: unparseable values become NULL
+-- and are counted by the DQ checks. Columns renamed to the mart names.
+SELECT order_id,
+       customer_id,
+       lower(trim(order_status))                            AS status,
+       TRY_CAST(order_purchase_timestamp AS TIMESTAMP)      AS purchase_ts,
+       TRY_CAST(order_approved_at AS TIMESTAMP)             AS approved_ts,
+       TRY_CAST(order_delivered_carrier_date AS TIMESTAMP)  AS delivered_carrier_ts,
+       TRY_CAST(order_delivered_customer_date AS TIMESTAMP) AS delivered_customer_ts,
+       CAST(TRY_CAST(order_estimated_delivery_date AS TIMESTAMP) AS DATE)
+                                                            AS estimated_delivery_date
+FROM orders
+QUALIFY row_number() OVER (PARTITION BY order_id ORDER BY order_purchase_timestamp) = 1
+ORDER BY order_id;

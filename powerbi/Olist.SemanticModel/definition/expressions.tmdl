@@ -1,0 +1,5 @@
+expression ExportsFolder = "D:\Downloads\Kientap\04-Ma-nguon\olist-dq-kpi\exports\" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+	lineageTag: 747d9600-f46c-5e7e-bc11-64a726a73605
+
+	annotation PBI_ResultType = Text
+

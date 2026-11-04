@@ -1,0 +1,53 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/1.0.0/schema.json",
+  "name": "qcard2",
+  "position": {
+    "x": 858,
+    "y": 16,
+    "z": 2,
+    "width": 405,
+    "height": 110,
+    "tabOrder": 2
+  },
+  "visual": {
+    "visualType": "card",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "kpis_clean"
+                    }
+                  },
+                  "Property": "K15 Worst-rated category"
+                }
+              },
+              "queryRef": "kpis_clean.K15 Worst-rated category",
+              "nativeQueryRef": "K15 Worst-rated category"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "objects": {
+      "labels": [
+        {
+          "properties": {
+            "labelDisplayUnits": {
+              "expr": {
+                "Literal": {
+                  "Value": "1D"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

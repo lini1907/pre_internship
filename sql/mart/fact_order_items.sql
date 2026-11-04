@@ -1,0 +1,12 @@
+-- One row per order item. Natural keys product_id and seller_id are kept (no surrogate
+-- keys joined in) so that Stage B can inject orphan keys.
+SELECT i.order_id,
+       i.order_item_id,
+       i.product_id,
+       i.seller_id,
+       i.price,
+       i.freight_value,
+       CAST(strftime(o.purchase_ts, '%Y%m%d') AS INTEGER) AS purchase_date_key
+FROM stg_order_items i
+LEFT JOIN stg_orders o USING (order_id)
+ORDER BY i.order_id, i.order_item_id;

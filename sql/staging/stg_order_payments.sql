@@ -1,0 +1,9 @@
+-- All payment rows are kept, including payment_type 'not_defined' and value 0
+-- (docs/cleaning_log.md); they are summed into fact_orders.payment_total.
+SELECT order_id,
+       TRY_CAST(payment_sequential AS INTEGER)   AS payment_sequential,
+       lower(trim(payment_type))                 AS payment_type,
+       TRY_CAST(payment_installments AS INTEGER) AS payment_installments,
+       TRY_CAST(payment_value AS DECIMAL(12,2))  AS payment_value
+FROM order_payments
+ORDER BY order_id, payment_sequential;

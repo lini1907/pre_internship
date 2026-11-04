@@ -1,0 +1,78 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/1.0.0/schema.json",
+  "name": "s_status",
+  "position": {
+    "x": 856,
+    "y": 142,
+    "z": 11,
+    "width": 408,
+    "height": 562,
+    "tabOrder": 11
+  },
+  "visual": {
+    "visualType": "clusteredBarChart",
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "fact_orders"
+                    }
+                  },
+                  "Property": "status"
+                }
+              },
+              "queryRef": "fact_orders.status",
+              "nativeQueryRef": "status"
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Measure": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "fact_order_items"
+                    }
+                  },
+                  "Property": "GMV all statuses"
+                }
+              },
+              "queryRef": "fact_order_items.GMV all statuses",
+              "nativeQueryRef": "GMV all statuses"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'GMV by order status (all statuses, window)'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -9,3 +9,6 @@ results/runs/
 results/stage_a/
 !results/tables/
 !results/figures/
+exports/
+powerbi/**/.pbi/localSettings.json
+powerbi/**/.pbi/cache.abf

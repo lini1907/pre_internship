@@ -1,0 +1,95 @@
+table dq_results
+	lineageTag: 79485752-f902-5bac-b8d0-bf4a910f3468
+
+	measure 'DQ score (mart)' = CALCULATE(1 - AVERAGE(dq_results[fail_share]), dq_results[layer] = "mart", dq_results[in_dq_score] = TRUE())
+		formatString: 0.00%
+		lineageTag: 239ce9e0-c03d-537f-b392-d7a67f7d14d9
+
+	measure 'Mart checks pass' = CALCULATE(COUNTROWS(dq_results), dq_results[layer] = "mart", dq_results[status] = "pass") + 0
+		formatString: 0
+		lineageTag: 2849b188-7d60-57ef-924f-5e3eeb0ebeeb
+
+	measure 'Mart checks warn' = CALCULATE(COUNTROWS(dq_results), dq_results[layer] = "mart", dq_results[status] = "warn") + 0
+		formatString: 0
+		lineageTag: 8784a275-fb07-5ea5-87da-23adc08b497e
+
+	measure 'Mart checks fail' = CALCULATE(COUNTROWS(dq_results), dq_results[layer] = "mart", dq_results[status] = "fail") + 0
+		formatString: 0
+		lineageTag: b25c355e-2aa1-58d7-b09d-ed9f3a36ec35
+
+	column check_id
+		dataType: string
+		lineageTag: f4cfc52c-9569-5b7a-bd82-5098763d2150
+		summarizeBy: none
+		sourceColumn: check_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column layer
+		dataType: string
+		lineageTag: e3613ad1-d668-5327-bc92-66b3dace1324
+		summarizeBy: none
+		sourceColumn: layer
+
+		annotation SummarizationSetBy = Automatic
+
+	column dimension
+		dataType: string
+		lineageTag: cddc5aae-9d39-59fe-8842-68ce30491900
+		summarizeBy: none
+		sourceColumn: dimension
+
+		annotation SummarizationSetBy = Automatic
+
+	column n_failed
+		dataType: int64
+		lineageTag: 91cb2447-f22d-54ab-bea7-59020c9f54ba
+		summarizeBy: none
+		sourceColumn: n_failed
+
+		annotation SummarizationSetBy = Automatic
+
+	column n_total
+		dataType: int64
+		lineageTag: f72d52be-2726-5901-ab41-6b3c5aa7a5be
+		summarizeBy: none
+		sourceColumn: n_total
+
+		annotation SummarizationSetBy = Automatic
+
+	column fail_share
+		dataType: double
+		formatString: 0.000%
+		lineageTag: 2be37223-621e-55a7-a6a1-1ee17fbb5fe4
+		summarizeBy: none
+		sourceColumn: fail_share
+
+		annotation SummarizationSetBy = Automatic
+
+	column status
+		dataType: string
+		lineageTag: ea77d21c-78cd-5757-9340-a5a9cef12226
+		summarizeBy: none
+		sourceColumn: status
+
+		annotation SummarizationSetBy = Automatic
+
+	column in_dq_score
+		dataType: boolean
+		lineageTag: f49d308f-32cb-5be6-a29e-903e81586145
+		summarizeBy: none
+		sourceColumn: in_dq_score
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dq_results = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(ExportsFolder & "dq_results.parquet")),
+				    Kept = Table.SelectColumns(Source, {"check_id", "layer", "dimension", "n_failed", "n_total", "fail_share", "status", "in_dq_score"}),
+				    Typed = Table.TransformColumnTypes(Kept, {{"check_id", type text}, {"layer", type text}, {"dimension", type text}, {"n_failed", Int64.Type}, {"n_total", Int64.Type}, {"fail_share", type number}, {"status", type text}, {"in_dq_score", type logical}})
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table

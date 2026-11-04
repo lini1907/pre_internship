@@ -1,0 +1,47 @@
+table k11_top_categories
+	lineageTag: d7fbab5f-4c52-5550-a77d-038a40b2721e
+
+	column kpi_id
+		dataType: string
+		lineageTag: d380ed35-d6b7-5ae3-acbb-323d8814dfdd
+		summarizeBy: none
+		sourceColumn: kpi_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column item
+		dataType: string
+		lineageTag: 92aa647a-5582-5a0d-a53a-bea0bff00c1e
+		summarizeBy: none
+		sourceColumn: item
+
+		annotation SummarizationSetBy = Automatic
+
+	column value
+		dataType: double
+		formatString: #,0.00
+		lineageTag: 6e4e3ed6-c999-5a35-b9d6-0f0d82c8158c
+		summarizeBy: sum
+		sourceColumn: value
+
+		annotation SummarizationSetBy = Automatic
+
+	column rank
+		dataType: int64
+		lineageTag: 221a908c-52f9-5e28-a0c3-1985aafbbdde
+		summarizeBy: none
+		sourceColumn: rank
+
+		annotation SummarizationSetBy = Automatic
+
+	partition k11_top_categories = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(ExportsFolder & "kpis_clean.parquet")),
+				    Selected = Table.SelectRows(Source, each [kpi_id] = "K11" and [rank] <> null and [rank] <= 10),
+				    Typed = Table.TransformColumnTypes(Selected, {{"kpi_id", type text}, {"item", type text}, {"value", type number}, {"rank", Int64.Type}})
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table

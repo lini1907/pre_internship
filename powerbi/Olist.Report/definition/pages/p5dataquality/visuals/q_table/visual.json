@@ -1,0 +1,162 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/1.0.0/schema.json",
+  "name": "q_table",
+  "position": {
+    "x": 16,
+    "y": 142,
+    "z": 10,
+    "width": 760,
+    "height": 562,
+    "tabOrder": 10
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dq_results"
+                    }
+                  },
+                  "Property": "check_id"
+                }
+              },
+              "queryRef": "dq_results.check_id",
+              "nativeQueryRef": "check_id"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dq_results"
+                    }
+                  },
+                  "Property": "layer"
+                }
+              },
+              "queryRef": "dq_results.layer",
+              "nativeQueryRef": "layer"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dq_results"
+                    }
+                  },
+                  "Property": "dimension"
+                }
+              },
+              "queryRef": "dq_results.dimension",
+              "nativeQueryRef": "dimension"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dq_results"
+                    }
+                  },
+                  "Property": "n_failed"
+                }
+              },
+              "queryRef": "dq_results.n_failed",
+              "nativeQueryRef": "n_failed"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dq_results"
+                    }
+                  },
+                  "Property": "n_total"
+                }
+              },
+              "queryRef": "dq_results.n_total",
+              "nativeQueryRef": "n_total"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dq_results"
+                    }
+                  },
+                  "Property": "fail_share"
+                }
+              },
+              "queryRef": "dq_results.fail_share",
+              "nativeQueryRef": "fail_share"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dq_results"
+                    }
+                  },
+                  "Property": "status"
+                }
+              },
+              "queryRef": "dq_results.status",
+              "nativeQueryRef": "status"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Column": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "dq_results"
+                  }
+                },
+                "Property": "check_id"
+              }
+            },
+            "direction": "Ascending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'DQ check results (clean build)'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

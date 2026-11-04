@@ -1,0 +1,90 @@
+table kpis_clean
+	lineageTag: 6c0276de-2cc3-5b25-8e28-b36a8b7b2cab
+
+	measure 'K1 GMV' = CALCULATE(SUM(kpis_clean[value]), kpis_clean[kpi_id] = "K1")
+		formatString: #,0
+		lineageTag: 2be14bf9-40f4-5353-8915-b61f4435240d
+
+	measure 'K2 Delivered orders' = CALCULATE(SUM(kpis_clean[value]), kpis_clean[kpi_id] = "K2")
+		formatString: #,0
+		lineageTag: c1bc7c5e-43de-54a6-82c7-9034d69fc90b
+
+	measure 'K3 AOV' = CALCULATE(SUM(kpis_clean[value]), kpis_clean[kpi_id] = "K3")
+		formatString: #,0.00
+		lineageTag: fc382287-e0a0-59ef-9511-e3517a317be2
+
+	measure 'K4 Freight ratio' = CALCULATE(SUM(kpis_clean[value]), kpis_clean[kpi_id] = "K4")
+		formatString: 0.0%
+		lineageTag: 09c9e378-0885-5f3b-a231-b52f5dec4980
+
+	measure 'K5 On-time rate' = CALCULATE(SUM(kpis_clean[value]), kpis_clean[kpi_id] = "K5")
+		formatString: 0.0%
+		lineageTag: 87111fec-5df6-5b21-93fb-36157b948b48
+
+	measure 'K6 Mean delivery days' = CALCULATE(SUM(kpis_clean[value]), kpis_clean[kpi_id] = "K6")
+		formatString: 0.00
+		lineageTag: fe0a3606-651f-56f7-8378-803b696ee9ed
+
+	measure 'K7 Avg review score' = CALCULATE(SUM(kpis_clean[value]), kpis_clean[kpi_id] = "K7")
+		formatString: 0.000
+		lineageTag: fd7c90c5-113f-5ac2-ab96-de23d59dd28a
+
+	measure 'K8 Negative review share' = CALCULATE(SUM(kpis_clean[value]), kpis_clean[kpi_id] = "K8")
+		formatString: 0.0%
+		lineageTag: 53b2401d-dd8a-5bb2-a6bc-b8bc1da1fd60
+
+	measure 'K9 Repeat customer rate' = CALCULATE(SUM(kpis_clean[value]), kpis_clean[kpi_id] = "K9")
+		formatString: 0.00%
+		lineageTag: b15b8512-8c30-553d-8913-c7d162c894e8
+
+	measure 'K10 Active customers' = CALCULATE(SUM(kpis_clean[value]), kpis_clean[kpi_id] = "K10")
+		formatString: #,0
+		lineageTag: 7e201303-ef79-52cf-be72-19ddb1c9b89a
+
+	measure 'K15 Worst-rated category' = CALCULATE(MIN(kpis_clean[item]), kpis_clean[kpi_id] = "K15", kpis_clean[rank] = 1)
+		lineageTag: dd300d26-9729-5960-987e-3d1beb8483c3
+
+	column kpi_id
+		dataType: string
+		lineageTag: 9d735579-db74-53b1-93f3-50a0c0c50ecc
+		summarizeBy: none
+		sourceColumn: kpi_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column item
+		dataType: string
+		lineageTag: ff4115dc-6022-508e-affb-08ec63634583
+		summarizeBy: none
+		sourceColumn: item
+
+		annotation SummarizationSetBy = Automatic
+
+	column value
+		dataType: double
+		formatString: #,0.00
+		lineageTag: 783ebbe0-295d-59c1-b01a-0cd18744244e
+		summarizeBy: sum
+		sourceColumn: value
+
+		annotation SummarizationSetBy = Automatic
+
+	column rank
+		dataType: int64
+		lineageTag: 613d6fe4-f8a0-563f-9313-73341b5fb329
+		summarizeBy: none
+		sourceColumn: rank
+
+		annotation SummarizationSetBy = Automatic
+
+	partition kpis_clean = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(ExportsFolder & "kpis_clean.parquet")),
+				    Kept = Table.SelectColumns(Source, {"kpi_id", "item", "value", "rank"}),
+				    Typed = Table.TransformColumnTypes(Kept, {{"kpi_id", type text}, {"item", type text}, {"value", type number}, {"rank", Int64.Type}})
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table

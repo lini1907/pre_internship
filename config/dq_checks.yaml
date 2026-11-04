@@ -1,0 +1,202 @@
+# Data quality checks (proposal table 5.4, code plan 3.5).
+#
+# Every query returns one row with n_failed and n_total. Placeholders {{orders}}, {{items}},
+# ... are replaced by the table names of the layer (see `layers`); $name parameters come
+# from `params` plus $ref_orders / $ref_items from `reference_rows` of the layer.
+#
+# status = fail if fail_share > fail_share threshold, warn if > warn_share, else pass.
+# Thresholds above zero on C02, C07 and C18 sit above the residual level in the clean
+# mart, so that the clean mart passes and a corruption of ~1 % still moves the check
+# (residual levels: docs/dq_catalogue.md). Stage B counts a run as "detected" when at
+# least one check is worse than its clean baseline (decision D3).
+
+version: 1
+
+params:
+  data_start: 2016-09-01        # every order timestamp must fall in [data_start, data_end)
+  data_end: 2018-11-01
+  payment_tolerance: 1.0        # BRL, C18
+  valid_states: [AC, AL, AM, AP, BA, CE, DF, ES, GO, MA, MG, MS, MT, PA, PB, PE, PI, PR,
+                 RJ, RN, RO, RR, RS, SC, SE, SP, TO]
+
+# Logical table -> physical table, per layer. A check runs on a layer only if it lists
+# that layer and every table it uses is mapped there.
+layers:
+  raw:
+    orders: orders
+    items: order_items
+  staging:
+    orders: stg_orders
+    items: stg_order_items
+    reviews: stg_order_reviews
+    customers: stg_customers
+    sellers: stg_sellers
+    products: stg_products
+  mart:
+    orders: fact_orders
+    items: fact_order_items
+    reviews: fact_orders
+    customers: dim_customer
+    sellers: dim_seller
+    products: dim_product
+
+# Row counts of the clean reference load (python run_pipeline.py, 2026-11-03).
+reference_rows:
+  raw: {orders: 99441, items: 112650}
+  staging: {orders: 99441, items: 112650}
+  mart: {orders: 99441, items: 112650}
+
+defaults:
+  warn_share: 0.0
+  fail_share: 0.001
+
+checks:
+  - id: C01
+    name: key columns not null (order_id; item order_id, product_id, seller_id)
+    dimension: completeness
+    layers: [staging, mart]
+    sql: dq/c01_keys_not_null.sql
+    in_dq_score: true
+
+  - id: C02
+    name: product has a translated category
+    dimension: completeness
+    layers: [staging, mart]
+    sql: dq/c02_product_category_present.sql
+    warn_share: 0.02
+    fail_share: 0.05
+    in_dq_score: true
+
+  - id: C03
+    name: delivered order has a customer delivery date
+    dimension: completeness
+    layers: [staging, mart]
+    sql: dq/c03_delivered_has_date.sql
+    in_dq_score: true
+
+  - id: C04
+    name: review has a score
+    dimension: completeness
+    layers: [staging, mart]
+    sql: dq/c04_review_has_score.sql
+    in_dq_score: true
+
+  - id: C05
+    name: order_id unique
+    dimension: uniqueness
+    layers: [staging, mart]
+    sql: dq/c05_order_id_unique.sql
+    in_dq_score: true
+
+  - id: C06
+    name: (order_id, order_item_id) unique
+    dimension: uniqueness
+    layers: [staging, mart]
+    sql: dq/c06_order_item_unique.sql
+    in_dq_score: true
+
+  - id: C07
+    name: review_id unique
+    dimension: uniqueness
+    layers: [staging, mart]
+    sql: dq/c07_review_id_unique.sql
+    warn_share: 0.02
+    fail_share: 0.05
+    in_dq_score: true
+
+  - id: C08
+    name: item references an existing product
+    dimension: referential_integrity
+    layers: [staging, mart]
+    sql: dq/c08_item_product_fk.sql
+    in_dq_score: false
+
+  - id: C09
+    name: item references an existing seller
+    dimension: referential_integrity
+    layers: [staging, mart]
+    sql: dq/c09_item_seller_fk.sql
+    in_dq_score: false
+
+  - id: C10
+    name: item references an existing order
+    dimension: referential_integrity
+    layers: [staging, mart]
+    sql: dq/c10_item_order_fk.sql
+    in_dq_score: false
+
+  - id: C11
+    name: price > 0
+    dimension: validity
+    layers: [staging, mart]
+    sql: dq/c11_price_positive.sql
+    in_dq_score: true
+
+  - id: C12
+    name: freight_value >= 0
+    dimension: validity
+    layers: [staging, mart]
+    sql: dq/c12_freight_nonnegative.sql
+    in_dq_score: true
+
+  - id: C13
+    name: review_score in 1..5
+    dimension: validity
+    layers: [staging, mart]
+    sql: dq/c13_review_score_range.sql
+    in_dq_score: true
+
+  - id: C14
+    name: customer and seller state is one of the 27 Brazilian states
+    dimension: validity
+    layers: [staging, mart]
+    sql: dq/c14_state_valid.sql
+    in_dq_score: true
+
+  - id: C15
+    name: approved_ts >= purchase_ts
+    dimension: temporal
+    layers: [staging, mart]
+    sql: dq/c15_approved_after_purchase.sql
+    in_dq_score: false
+
+  - id: C16
+    name: delivered_customer_ts >= purchase_ts
+    dimension: temporal
+    layers: [staging, mart]
+    sql: dq/c16_delivered_after_purchase.sql
+    in_dq_score: false
+
+  - id: C17
+    name: order timestamps within the data period
+    dimension: temporal
+    layers: [staging, mart]
+    sql: dq/c17_timestamps_in_period.sql
+    in_dq_score: false
+
+  - id: C18
+    name: payment_total matches sum(price + freight) within tolerance
+    dimension: reconciliation
+    layers: [mart]
+    sql: dq/c18_payment_reconciles.sql
+    warn_share: 0.005
+    fail_share: 0.01
+    in_dq_score: false
+
+  - id: C19
+    name: orders row count within tolerance of the reference load
+    dimension: volume
+    layers: [raw, staging, mart]
+    sql: dq/c19_orders_volume.sql
+    warn_share: 0.01
+    fail_share: 0.05
+    in_dq_score: false
+
+  - id: C20
+    name: order item row count within tolerance of the reference load
+    dimension: volume
+    layers: [raw, staging, mart]
+    sql: dq/c20_items_volume.sql
+    warn_share: 0.01
+    fail_share: 0.05
+    in_dq_score: false

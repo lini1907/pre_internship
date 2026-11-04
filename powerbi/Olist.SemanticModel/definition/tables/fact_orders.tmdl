@@ -1,0 +1,144 @@
+table fact_orders
+	lineageTag: 618ef731-cf6b-53f9-8b44-4d0d516fc176
+
+	measure 'On-time rate' = CALCULATE(AVERAGE(fact_orders[on_time]), fact_orders[in_window] = TRUE(), fact_orders[is_delivered] = TRUE())
+		formatString: 0.0%
+		lineageTag: 8778490d-c56c-576e-936e-a3719ba101ff
+
+	measure 'Mean delivery days' = CALCULATE(AVERAGE(fact_orders[delivery_days]), fact_orders[in_window] = TRUE(), fact_orders[is_delivered] = TRUE())
+		formatString: 0.0
+		lineageTag: 0e295fdd-1e89-5a5c-91ab-b80d30960761
+
+	measure 'Avg review score' = CALCULATE(AVERAGE(fact_orders[review_score]), fact_orders[in_window] = TRUE())
+		formatString: 0.00
+		lineageTag: c08a5c81-31fb-524a-b0d1-01e7541c6620
+
+	measure 'Reviewed orders' = CALCULATE(COUNTROWS(fact_orders), fact_orders[in_window] = TRUE(), KEEPFILTERS(NOT ISBLANK(fact_orders[review_score])))
+		formatString: #,0
+		lineageTag: a3931df9-2700-59df-be8c-791e351bb432
+
+	measure 'Delivered orders (mart)' = CALCULATE(COUNTROWS(fact_orders), fact_orders[in_window] = TRUE(), fact_orders[is_delivered] = TRUE())
+		formatString: #,0
+		lineageTag: 638f8f97-61c0-547f-97af-e988f8400c40
+
+	column order_id
+		dataType: string
+		lineageTag: 992f7f21-32bc-55ac-873d-376433289caa
+		summarizeBy: none
+		sourceColumn: order_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column customer_unique_id
+		dataType: string
+		lineageTag: 47070565-71c8-5300-9ec2-b93bff0b46a1
+		summarizeBy: none
+		sourceColumn: customer_unique_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column status
+		dataType: string
+		lineageTag: bcd5fd1f-f1b8-564a-bc7b-b8caadf09eb4
+		summarizeBy: none
+		sourceColumn: status
+
+		annotation SummarizationSetBy = Automatic
+
+	column purchase_ts
+		dataType: dateTime
+		lineageTag: a8c6c4f7-4351-5460-9e1b-0a00cc5c4738
+		summarizeBy: none
+		sourceColumn: purchase_ts
+
+		annotation SummarizationSetBy = Automatic
+
+	column delivered_customer_ts
+		dataType: dateTime
+		lineageTag: a317933b-bf7a-5dd2-b6d7-c37142e23ed1
+		summarizeBy: none
+		sourceColumn: delivered_customer_ts
+
+		annotation SummarizationSetBy = Automatic
+
+	column estimated_delivery_date
+		dataType: dateTime
+		lineageTag: 4e7402d2-d6b1-512b-8657-b2a4a02b5c52
+		summarizeBy: none
+		sourceColumn: estimated_delivery_date
+
+		annotation SummarizationSetBy = Automatic
+
+	column payment_total
+		dataType: double
+		formatString: #,0.00
+		lineageTag: 21f8e044-6da5-5505-9cb4-760af82db467
+		summarizeBy: none
+		sourceColumn: payment_total
+
+		annotation SummarizationSetBy = Automatic
+
+	column review_score
+		dataType: int64
+		lineageTag: e95fe9e2-331c-5c2b-82d2-1f1f91d62b7c
+		summarizeBy: none
+		sourceColumn: review_score
+
+		annotation SummarizationSetBy = Automatic
+
+	column is_delivered
+		dataType: boolean
+		lineageTag: 15fcabd4-c3bd-5735-9460-c043a0cb7f85
+		summarizeBy: none
+		sourceColumn: is_delivered
+
+		annotation SummarizationSetBy = Automatic
+
+	column purchase_date_key
+		dataType: int64
+		lineageTag: 1fc11e4d-2bdb-5a06-bbe1-c9f599daafe3
+		summarizeBy: none
+		sourceColumn: purchase_date_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column in_window
+		dataType: boolean
+		lineageTag: c5de75f9-932d-5447-a316-263ca50102c0
+		summarizeBy: none
+		sourceColumn: in_window
+
+		annotation SummarizationSetBy = Automatic
+
+	column on_time
+		dataType: int64
+		lineageTag: c364cfc6-934d-5bed-a396-7d24775e188d
+		summarizeBy: none
+		sourceColumn: on_time
+
+		annotation SummarizationSetBy = Automatic
+
+	column delivery_days
+		dataType: double
+		formatString: 0.0
+		lineageTag: 94bf8cba-07df-5ed0-8912-cd354e3d754b
+		summarizeBy: none
+		sourceColumn: delivery_days
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_orders = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(ExportsFolder & "fact_orders.parquet")),
+				    Kept = Table.SelectColumns(Source, {"order_id", "customer_unique_id", "status", "purchase_ts", "delivered_customer_ts", "estimated_delivery_date", "payment_total", "review_score", "is_delivered"}),
+				    DateKey = Table.AddColumn(Kept, "purchase_date_key", each if [purchase_ts] = null then null else Number.From(DateTime.ToText([purchase_ts], "yyyyMMdd"))),
+				    InWindow = Table.AddColumn(DateKey, "in_window", each [purchase_ts] <> null and [purchase_ts] >= #datetime(2017, 1, 1, 0, 0, 0) and [purchase_ts] < #datetime(2018, 9, 1, 0, 0, 0)),
+				    OnTime = Table.AddColumn(InWindow, "on_time", each if [delivered_customer_ts] = null then null else if Date.From([delivered_customer_ts]) <= Date.From([estimated_delivery_date]) then 1 else 0),
+				    Days = Table.AddColumn(OnTime, "delivery_days", each if [delivered_customer_ts] = null then null else Duration.TotalDays([delivered_customer_ts] - [purchase_ts])),
+				    Typed = Table.TransformColumnTypes(Days, {{"order_id", type text}, {"customer_unique_id", type text}, {"status", type text}, {"purchase_ts", type datetime}, {"delivered_customer_ts", type datetime}, {"estimated_delivery_date", type datetime}, {"payment_total", type number}, {"review_score", Int64.Type}, {"is_delivered", type logical}, {"purchase_date_key", Int64.Type}, {"in_window", type logical}, {"on_time", Int64.Type}, {"delivery_days", type number}})
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table

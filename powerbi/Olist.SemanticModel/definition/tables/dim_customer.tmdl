@@ -1,0 +1,30 @@
+table dim_customer
+	lineageTag: 961831ca-eaff-5b21-9002-940125c3f974
+
+	column customer_unique_id
+		dataType: string
+		lineageTag: bcf8d3d3-5296-5600-8301-602c920a4cdc
+		summarizeBy: none
+		sourceColumn: customer_unique_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column state
+		dataType: string
+		lineageTag: c8e4a608-042b-5eb1-adb7-82719eabda43
+		summarizeBy: none
+		sourceColumn: state
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_customer = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(ExportsFolder & "dim_customer.parquet")),
+				    Kept = Table.SelectColumns(Source, {"customer_unique_id", "state"}),
+				    Typed = Table.TransformColumnTypes(Kept, {{"customer_unique_id", type text}, {"state", type text}})
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table

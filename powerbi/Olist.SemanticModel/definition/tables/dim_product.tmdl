@@ -1,0 +1,38 @@
+table dim_product
+	lineageTag: 24d673bc-1f1e-5614-af6c-48243324cdb6
+
+	column product_id
+		dataType: string
+		lineageTag: 82aed6b6-6879-5801-8df4-f0ad4f96f2ed
+		summarizeBy: none
+		sourceColumn: product_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column category_pt
+		dataType: string
+		lineageTag: 8468b58a-b838-5805-9f12-62d10dfc5da3
+		summarizeBy: none
+		sourceColumn: category_pt
+
+		annotation SummarizationSetBy = Automatic
+
+	column category_en
+		dataType: string
+		lineageTag: 603a7770-51b5-5689-a609-7597dfe24714
+		summarizeBy: none
+		sourceColumn: category_en
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_product = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(ExportsFolder & "dim_product.parquet")),
+				    Kept = Table.SelectColumns(Source, {"product_id", "category_pt", "category_en"}),
+				    Typed = Table.TransformColumnTypes(Kept, {{"product_id", type text}, {"category_pt", type text}, {"category_en", type text}})
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table

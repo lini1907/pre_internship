@@ -1,0 +1,47 @@
+table k15_categories
+	lineageTag: 8d94aa24-a0be-5451-84fb-392351b4e00a
+
+	column kpi_id
+		dataType: string
+		lineageTag: 67d3fa59-5b30-5663-9d45-7ffaaa44eac5
+		summarizeBy: none
+		sourceColumn: kpi_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column item
+		dataType: string
+		lineageTag: 97d98880-4c7f-5aee-8705-5e8c85642053
+		summarizeBy: none
+		sourceColumn: item
+
+		annotation SummarizationSetBy = Automatic
+
+	column value
+		dataType: double
+		formatString: #,0.00
+		lineageTag: e329b831-994a-56f6-9062-0e42c21ecf5e
+		summarizeBy: sum
+		sourceColumn: value
+
+		annotation SummarizationSetBy = Automatic
+
+	column rank
+		dataType: int64
+		lineageTag: e76c8ced-11e0-52ec-9e5c-c79e69f23eac
+		summarizeBy: none
+		sourceColumn: rank
+
+		annotation SummarizationSetBy = Automatic
+
+	partition k15_categories = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(ExportsFolder & "kpis_clean.parquet")),
+				    Selected = Table.SelectRows(Source, each [kpi_id] = "K15"),
+				    Typed = Table.TransformColumnTypes(Selected, {{"kpi_id", type text}, {"item", type text}, {"value", type number}, {"rank", Int64.Type}})
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table

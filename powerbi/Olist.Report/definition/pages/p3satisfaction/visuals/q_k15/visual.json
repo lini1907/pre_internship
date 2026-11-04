@@ -1,0 +1,111 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/1.0.0/schema.json",
+  "name": "q_k15",
+  "position": {
+    "x": 440,
+    "y": 428,
+    "z": 12,
+    "width": 824,
+    "height": 276,
+    "tabOrder": 12
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "k15_categories"
+                    }
+                  },
+                  "Property": "rank"
+                }
+              },
+              "queryRef": "k15_categories.rank",
+              "nativeQueryRef": "rank"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "k15_categories"
+                    }
+                  },
+                  "Property": "item"
+                }
+              },
+              "queryRef": "k15_categories.item",
+              "nativeQueryRef": "item"
+            },
+            {
+              "field": {
+                "Aggregation": {
+                  "Expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "k15_categories"
+                        }
+                      },
+                      "Property": "value"
+                    }
+                  },
+                  "Function": 0
+                }
+              },
+              "queryRef": "Sum(k15_categories.value)",
+              "nativeQueryRef": "Sum of value"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Column": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "k15_categories"
+                  }
+                },
+                "Property": "rank"
+              }
+            },
+            "direction": "Ascending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'K15 Eligible categories (>= 100 reviewed orders), worst first'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

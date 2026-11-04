@@ -1,0 +1,72 @@
+table fact_order_items
+	lineageTag: 58a11196-bb8f-5946-aa0c-310fe38c4d5a
+
+	measure 'GMV (mart)' = CALCULATE(SUM(fact_order_items[price]), fact_orders[in_window] = TRUE(), fact_orders[is_delivered] = TRUE())
+		formatString: #,0
+		lineageTag: f7313a43-ad3a-5da9-b406-3067060cb2bc
+
+	measure 'GMV all statuses' = CALCULATE(SUM(fact_order_items[price]), fact_orders[in_window] = TRUE())
+		formatString: #,0
+		lineageTag: dd5a43c1-e01f-5dbc-b938-c78553723d4f
+
+	column order_id
+		dataType: string
+		lineageTag: 98baf415-0e59-50e9-b9f1-4e84fa8baa43
+		summarizeBy: none
+		sourceColumn: order_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column order_item_id
+		dataType: int64
+		lineageTag: 972109d6-4799-598a-b73b-77d7f1f2ecb2
+		summarizeBy: none
+		sourceColumn: order_item_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column product_id
+		dataType: string
+		lineageTag: 28dedfe2-bc21-5871-aea3-b8e139bfe99e
+		summarizeBy: none
+		sourceColumn: product_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column seller_id
+		dataType: string
+		lineageTag: 8b02c0d2-7abd-51d8-a3fb-d2c9bba3e385
+		summarizeBy: none
+		sourceColumn: seller_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column price
+		dataType: double
+		formatString: #,0.00
+		lineageTag: 6ad3a674-ca51-5ec0-a122-746619be239d
+		summarizeBy: sum
+		sourceColumn: price
+
+		annotation SummarizationSetBy = Automatic
+
+	column freight_value
+		dataType: double
+		formatString: #,0.00
+		lineageTag: bab82f1f-1393-5396-92db-9a341e111fa8
+		summarizeBy: sum
+		sourceColumn: freight_value
+
+		annotation SummarizationSetBy = Automatic
+
+	partition fact_order_items = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(ExportsFolder & "fact_order_items.parquet")),
+				    Kept = Table.SelectColumns(Source, {"order_id", "order_item_id", "product_id", "seller_id", "price", "freight_value"}),
+				    Typed = Table.TransformColumnTypes(Kept, {{"order_id", type text}, {"order_item_id", Int64.Type}, {"product_id", type text}, {"seller_id", type text}, {"price", type number}, {"freight_value", type number}})
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table

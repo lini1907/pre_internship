@@ -1,0 +1,101 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/1.0.0/schema.json",
+  "name": "q_share",
+  "position": {
+    "x": 792,
+    "y": 142,
+    "z": 11,
+    "width": 472,
+    "height": 562,
+    "tabOrder": 11
+  },
+  "visual": {
+    "visualType": "clusteredBarChart",
+    "query": {
+      "queryState": {
+        "Category": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dq_results"
+                    }
+                  },
+                  "Property": "check_id"
+                }
+              },
+              "queryRef": "dq_results.check_id",
+              "nativeQueryRef": "check_id"
+            }
+          ]
+        },
+        "Y": {
+          "projections": [
+            {
+              "field": {
+                "Aggregation": {
+                  "Expression": {
+                    "Column": {
+                      "Expression": {
+                        "SourceRef": {
+                          "Entity": "dq_results"
+                        }
+                      },
+                      "Property": "fail_share"
+                    }
+                  },
+                  "Function": 0
+                }
+              },
+              "queryRef": "Sum(dq_results.fail_share)",
+              "nativeQueryRef": "Sum of fail_share"
+            }
+          ]
+        },
+        "Series": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "dq_results"
+                    }
+                  },
+                  "Property": "layer"
+                }
+              },
+              "queryRef": "dq_results.layer",
+              "nativeQueryRef": "layer"
+            }
+          ]
+        }
+      }
+    },
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Failure share by check and layer'"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

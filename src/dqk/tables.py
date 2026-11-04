@@ -7,7 +7,8 @@ from dataclasses import dataclass, field, fields
 import pandas as pd
 
 # Column types of the mart (section 3.3 of the code plan). Used to build empty
-# schemas for SQL compile tests and, in Stage A2, to check the mart output.
+# schemas for SQL compile tests and to check the output of build_mart.
+# fact_orders.review_id lets check C04 tell "no review" from "review without score".
 MART_SCHEMA: dict[str, dict[str, str]] = {
     "dim_customer": {
         "customer_key": "INTEGER",
@@ -51,6 +52,7 @@ MART_SCHEMA: dict[str, dict[str, str]] = {
         "delivered_customer_ts": "TIMESTAMP",
         "estimated_delivery_date": "DATE",
         "payment_total": "DECIMAL(12,2)",
+        "review_id": "VARCHAR",
         "review_score": "INTEGER",
         "is_delivered": "BOOLEAN",
     },

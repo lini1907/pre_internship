@@ -1,0 +1,23 @@
+model Model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation PBI_QueryOrder = ["ExportsFolder", "fact_orders", "fact_order_items", "dim_customer", "dim_product", "dim_seller", "dim_date", "kpis_clean", "dq_results", "k11_top_categories", "k12_top_sellers", "k13_top_states", "k14_monthly_gmv", "k15_categories"]
+
+ref table fact_orders
+ref table fact_order_items
+ref table dim_customer
+ref table dim_product
+ref table dim_seller
+ref table dim_date
+ref table kpis_clean
+ref table dq_results
+ref table k11_top_categories
+ref table k12_top_sellers
+ref table k13_top_states
+ref table k14_monthly_gmv
+ref table k15_categories

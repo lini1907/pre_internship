@@ -1,0 +1,54 @@
+table dim_date
+	lineageTag: 8133c730-fcb3-55d6-a95f-f5a44ef9d314
+
+	column date_key
+		dataType: int64
+		lineageTag: 2d1c4e0d-7359-54b8-a401-4ffbc870c7ed
+		summarizeBy: none
+		sourceColumn: date_key
+
+		annotation SummarizationSetBy = Automatic
+
+	column date
+		dataType: dateTime
+		lineageTag: 8637fb97-1703-51d1-be02-9aa8d698262e
+		summarizeBy: none
+		sourceColumn: date
+
+		annotation SummarizationSetBy = Automatic
+
+	column year
+		dataType: int64
+		lineageTag: 1948d3f0-0433-5670-9aeb-5ca517120c66
+		summarizeBy: none
+		sourceColumn: year
+
+		annotation SummarizationSetBy = Automatic
+
+	column month
+		dataType: int64
+		lineageTag: aec895ab-217d-52fa-ad77-024895ea3cfc
+		summarizeBy: none
+		sourceColumn: month
+
+		annotation SummarizationSetBy = Automatic
+
+	column year_month
+		dataType: string
+		lineageTag: c8be057f-c738-5a3d-8cfa-0e0034b222fa
+		summarizeBy: none
+		sourceColumn: year_month
+
+		annotation SummarizationSetBy = Automatic
+
+	partition dim_date = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(ExportsFolder & "dim_date.parquet")),
+				    Kept = Table.SelectColumns(Source, {"date_key", "date", "year", "month", "year_month"}),
+				    Typed = Table.TransformColumnTypes(Kept, {{"date_key", Int64.Type}, {"date", type datetime}, {"year", Int64.Type}, {"month", Int64.Type}, {"year_month", type text}})
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table

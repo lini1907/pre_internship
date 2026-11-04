@@ -1,0 +1,47 @@
+table k14_monthly_gmv
+	lineageTag: 50a56234-bbd6-5923-9841-6ff2667f3f9d
+
+	column kpi_id
+		dataType: string
+		lineageTag: e7357fe5-d0a1-5a1f-96cb-7db7af4c1476
+		summarizeBy: none
+		sourceColumn: kpi_id
+
+		annotation SummarizationSetBy = Automatic
+
+	column item
+		dataType: string
+		lineageTag: 999d86eb-87e0-5cdf-b9e1-1ca67fee7900
+		summarizeBy: none
+		sourceColumn: item
+
+		annotation SummarizationSetBy = Automatic
+
+	column value
+		dataType: double
+		formatString: #,0.00
+		lineageTag: 398877f5-294e-5578-ab19-c6270a13c2e6
+		summarizeBy: sum
+		sourceColumn: value
+
+		annotation SummarizationSetBy = Automatic
+
+	column rank
+		dataType: int64
+		lineageTag: e037221c-5a22-582c-9f9a-80252a093958
+		summarizeBy: none
+		sourceColumn: rank
+
+		annotation SummarizationSetBy = Automatic
+
+	partition k14_monthly_gmv = m
+		mode: import
+		source =
+				let
+				    Source = Parquet.Document(File.Contents(ExportsFolder & "kpis_clean.parquet")),
+				    Selected = Table.SelectRows(Source, each [kpi_id] = "K14"),
+				    Typed = Table.TransformColumnTypes(Selected, {{"kpi_id", type text}, {"item", type text}, {"value", type number}, {"rank", Int64.Type}})
+				in
+				    Typed
+
+	annotation PBI_ResultType = Table

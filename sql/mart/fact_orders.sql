@@ -1,0 +1,24 @@
+-- One row per order, any status. payment_total is NULL for orders with no payment row;
+-- review_id and review_score are NULL for orders with no review.
+WITH pay AS (
+    SELECT order_id, sum(payment_value) AS payment_total
+    FROM stg_order_payments
+    GROUP BY 1
+)
+SELECT o.order_id,
+       c.customer_unique_id,
+       o.status,
+       o.purchase_ts,
+       o.approved_ts,
+       o.delivered_carrier_ts,
+       o.delivered_customer_ts,
+       o.estimated_delivery_date,
+       CAST(p.payment_total AS DECIMAL(12,2)) AS payment_total,
+       r.review_id,
+       r.review_score,
+       o.status = 'delivered' AS is_delivered
+FROM stg_orders o
+LEFT JOIN stg_customers c USING (customer_id)
+LEFT JOIN pay p USING (order_id)
+LEFT JOIN stg_order_reviews r USING (order_id)
+ORDER BY o.order_id;
