@@ -14,7 +14,7 @@ Status: **Stage A done (week A3)** — staging, mart, 15 KPIs, 20 DQ checks, `ru
 Requires Python 3.12 and internet access to kaggle.com on the first run.
 
 ```bash
-git clone <repo-url> olist-dq-kpi && cd olist-dq-kpi
+git clone https://github.com/lini1907/-internship-.git olist-dq-kpi && cd olist-dq-kpi
 python -m venv .venv
 .venv\Scripts\activate              # Windows cmd / PowerShell
 # source .venv/Scripts/activate     # Windows Git Bash
