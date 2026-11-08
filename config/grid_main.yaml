@@ -1,0 +1,52 @@
+# Main experiment grid (proposal 6.1-6.2, code plan 4.1).
+# 13 (error x mechanism) combinations x 5 rates = 65 cells, one main variant per error.
+# Seeds are 0 .. n_seeds-1. Every cell with the same (code, variant) and seed shares its
+# random numbers, so rates are nested and mechanisms are paired (code plan 4.2).
+#
+# MAR:  {by: <unit attribute>, groups: [...], weight: w}  -> units in groups w times as likely
+# MNAR: {by_value: <numeric unit attribute>, strength: s, log: bool} -> weight exp(s * z)
+# Unit attributes: orders  customer_state, seller_state, delivery_delay_days, review_score
+#                  items   category, seller_state, price
+#                  products category
+
+name: main
+rates: [0.01, 0.02, 0.05, 0.10, 0.20]
+n_seeds: 200
+
+errors:
+  - code: E1
+    variant: duplicate_order
+    mechanisms:
+      MCAR: {}
+      MAR: {by: seller_state, groups: [SP], weight: 5}
+
+  - code: E2
+    variant: orphan_product
+    mechanisms:
+      MCAR: {}
+      MAR: {by: category, groups: [health_beauty, watches_gifts], weight: 5}
+
+  - code: E3
+    variant: missing_delivery_date
+    mechanisms:
+      MCAR: {}
+      MAR: {by: customer_state, groups: [RJ, BA], weight: 5}
+      MNAR: {by_value: delivery_delay_days, strength: 1.0}
+
+  - code: E4
+    variant: tz_shift_3h
+    mechanisms:
+      MCAR: {}
+      MAR: {by: customer_state, groups: [RJ, MG], weight: 5}
+
+  - code: E5
+    variant: price_x100
+    mechanisms:
+      MCAR: {}
+      MNAR: {by_value: price, strength: 1.0, log: true}
+
+  - code: E6
+    variant: category_reassign
+    mechanisms:
+      MCAR: {}
+      MAR: {by: category, groups: [bed_bath_table, furniture_decor], weight: 5}
