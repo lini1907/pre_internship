@@ -18,6 +18,7 @@ import pandas as pd
 from dqk import RESULTS_DIR
 from dqk.analysis import figures as F
 from dqk.analysis.stats import (
+    RQ1_KPIS,
     describe_cells,
     detecting_checks,
     load_results,
@@ -132,6 +133,43 @@ def main_grid(folder: Path, n_boot: int) -> list[str]:
     return md, r
 
 
+def rq1_sensitivity(main, rk) -> pd.DataFrame:
+    """RQ1 under the design choices left open (D6 and the ranking KPIs):
+    E1 as duplicate_order or duplicate_order_rekeyed; KPI set K1-K10+K14 or also K11-K13+K15;
+    ranking distortion as 1 - top-k overlap or 1 - Kendall tau_b."""
+    rekeyed = pd.concat([main.kpi[main.kpi["code"] != "E1"], rk.kpi], ignore_index=True)
+    all_kpis = RQ1_KPIS + ["K11", "K12", "K13", "K15"]
+
+    def by_tau(k: pd.DataFrame) -> pd.DataFrame:
+        k = k.copy()
+        r = k["kpi_type"] == "ranking"
+        k.loc[r, "distortion"] = 1.0 - k.loc[r, "kendall_tau_b"]
+        return k
+
+    variants = [
+        ("main: E1 same key, 11 KPIs", main.kpi, RQ1_KPIS),
+        ("E1 same key, 15 KPIs, overlap", main.kpi, all_kpis),
+        ("E1 same key, 15 KPIs, Kendall tau", by_tau(main.kpi), all_kpis),
+        ("E1 re-keyed, 11 KPIs", rekeyed, RQ1_KPIS),
+        ("E1 re-keyed, 15 KPIs, overlap", rekeyed, all_kpis),
+        ("E1 re-keyed, 15 KPIs, Kendall tau", by_tau(rekeyed), all_kpis),
+    ]
+    rows = []
+    for name, k, kpis in variants:
+        r = rq1_friedman(k, kpis=kpis)
+        t = r["tests"].iloc[0]
+        rows.append(
+            r["ranks"].assign(
+                variant=name,
+                n_blocks=int(t["n_blocks"]),
+                n_tied=r["n_blocks_all_tied"],
+                kendall_w=t["kendall_w"],
+                p=t["p"],
+            )
+        )
+    return pd.concat(rows, ignore_index=True)
+
+
 def robustness(root: Path, main, n_boot: int) -> list[str]:
     scen = sorted(p for p in root.iterdir() if p.is_dir() and any(p.glob("*.runs.parquet")))
     if not scen:
@@ -200,6 +238,16 @@ def robustness(root: Path, main, n_boot: int) -> list[str]:
     ]
     if "rekeyed" in {p.name for p in scen}:
         rk = load_results(root / "rekeyed")
+        sens = rq1_sensitivity(main, rk)
+        sens.to_csv(TABLES / "r6_rq1_sensitivity.csv", index=False)
+        wide = sens.pivot_table(index="variant", columns="code", values="mean_rank", sort=False)
+        meta = sens.groupby("variant", sort=False)[["n_blocks", "n_tied", "kendall_w", "p"]].first()
+        md += [
+            "## RQ1 sensitivity: E1 variant, KPI set, ranking measure (MCAR, all rates)\n",
+            "Mean rank (1 = least distortion). Main result = first row.\n",
+            _md(wide.join(meta).reset_index()),
+            "",
+        ]
         both = pd.concat([main.runs[main.runs["code"] == "E1"], rk.runs])
         s = rq3_silent(both, by=("code", "variant", "rate"), tau=0.01)
         s.to_csv(TABLES / "r5_rq3_rekeyed_vs_duplicate.csv", index=False)

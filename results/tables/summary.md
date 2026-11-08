@@ -208,6 +208,19 @@ Kendall's W: alt_kpi 0.36, main 0.36, no_top1pct 0.34, period_2017 0.38, period_
 | E6 | category_spelling | 0.05 | nan | nan | nan | nan | nan | nan | 0.885 |
 | E6 | category_spelling | 0.1 | nan | nan | nan | nan | nan | nan | 0.885 |
 
+## RQ1 sensitivity: E1 variant, KPI set, ranking measure (MCAR, all rates)
+
+Mean rank (1 = least distortion). Main result = first row.
+
+| variant | E2 | E6 | E4 | E3 | E5 | E1 | n_blocks | n_tied | kendall_w | p |
+|---|---|---|---|---|---|---|---|---|---|---|
+| main: E1 same key, 11 KPIs | 2.77 | 2.77 | 3.25 | 3.31 | 4.09 | 4.81 | 55 | 15 | 0.369 | 2.52e-20 |
+| E1 same key, 15 KPIs, overlap | 2.91 | 2.91 | 3.26 | 3.31 | 4.2 | 4.41 | 75 | 27 | 0.291 | 6.24e-22 |
+| E1 same key, 15 KPIs, Kendall tau | 2.84 | 2.97 | 3.14 | 3.19 | 4.26 | 4.61 | 75 | 25 | 0.333 | 2.66e-25 |
+| E1 re-keyed, 11 KPIs | 2.68 | 2.68 | 3.15 | 3.24 | 4 | 5.25 | 55 | 5 | 0.478 | 1.16e-26 |
+| E1 re-keyed, 15 KPIs, overlap | 2.85 | 2.85 | 3.19 | 3.25 | 4.13 | 4.73 | 75 | 17 | 0.355 | 4.79e-27 |
+| E1 re-keyed, 15 KPIs, Kendall tau | 2.81 | 2.91 | 3.1 | 3.16 | 4.19 | 4.83 | 75 | 15 | 0.368 | 5.02e-28 |
+
 ## D6: re-keyed duplicates vs plain duplicates (silent rate, τ = 0.01)
 
 | variant | rate | silent_rate | silent_lo | silent_hi | material_rate | detected_rate |
