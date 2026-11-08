@@ -236,3 +236,93 @@ Mean rank (1 = least distortion). Main result = first row.
 | duplicate_order_rekeyed | 0.1 | 0 | 0 | 0.00951 | 1 | 1 |
 | duplicate_order_rekeyed | 0.2 | 0 | 0 | 0.00951 | 1 | 1 |
 
+
+# Online Retail II (code plan 4.7)
+
+30 cells, 6000 runs. KPIs K1, K2, K3, K9, K10, K14, K11, K13; E3 = missing_customer_id (Olist main grid: missing_delivery_date); E6 not applicable. Mapping: `docs/retail_adapter.md`.
+
+## Median distortion at 5 % (MCAR), Olist (O) vs Online Retail II (R)
+
+Scalar: relative error; K14: MAPD; K11/K13: 1 − top-k overlap.
+
+| code | K1 O | K1 R | K2 O | K2 R | K3 O | K3 R | K9 O | K9 R | K10 O | K10 R | K14 O | K14 R | K11 O | K11 R | K13 O | K13 R |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| E1 | 0.15 | 0.149 | 0 | 0 | 0.15 | 0.149 | 0 | 0 | 0 | 0 | 0.15 | 0.149 | 0 | 0 | 0 | 0 |
+| E2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| E3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.00922 | 0 | 0.0145 | 0 | 0 | 0 | 0 | 0 | 0 |
+| E4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0.000389 | 0 | 0 | 0 | 0 | 0 |
+| E5 | 4.96 | 4.95 | 0 | 0 | 4.96 | 4.95 | 0 | 0 | 0 | 0 | 4.96 | 4.95 | 0.1 | 0.3 | 0 | 0 |
+
+## RQ1 on the KPIs both datasets share (MCAR, E1–E5)
+
+| code | olist (E1-E5) | retail |
+|---|---|---|
+| E1 | 3.5 | 3.33 |
+| E2 | 2.42 | 2.33 |
+| E3 | 2.42 | 3.17 |
+| E4 | 2.67 | 2.33 |
+| E5 | 4 | 3.83 |
+
+Kendall's W: olist (E1-E5) 0.48 (p = 9.1e-12), retail 0.30 (p = 2.3e-07)
+
+## RQ2 ρ (DQ score drop vs distortion), shared KPIs
+
+| group | olist | retail |
+|---|---|---|
+| count | nan | -0.198 |
+| monetary | 0.154 | 0.145 |
+| ranking | -0.144 | -0.102 |
+| rate | nan | -0.198 |
+| ratio | 0.154 | 0.145 |
+| series | 0.0202 | 0.145 |
+
+## RQ3 silent rate (MCAR, τ = 0.01)
+
+| code | rate | olist | retail |
+|---|---|---|---|
+| E1 | 0.01 | 0 | 0 |
+| E1 | 0.02 | 0 | 0 |
+| E1 | 0.05 | 0 | 0 |
+| E1 | 0.1 | 0 | 0 |
+| E1 | 0.2 | 0 | 0 |
+| E2 | 0.01 | 0 | 0 |
+| E2 | 0.02 | 0 | 0 |
+| E2 | 0.05 | 0 | 0 |
+| E2 | 0.1 | 0 | 0 |
+| E2 | 0.2 | 0 | 0 |
+| E3 | 0.01 | 0 | 0.025 |
+| E3 | 0.02 | 0 | 0.035 |
+| E3 | 0.05 | 0 | 1 |
+| E3 | 0.1 | 0 | 1 |
+| E3 | 0.2 | 0 | 1 |
+| E4 | 0.01 | 0 | 0 |
+| E4 | 0.02 | 0 | 0 |
+| E4 | 0.05 | 0 | 0 |
+| E4 | 0.1 | 0 | 0 |
+| E4 | 0.2 | 0 | 0 |
+| E5 | 0.01 | 0 | 1 |
+| E5 | 0.02 | 0 | 1 |
+| E5 | 0.05 | 0 | 1 |
+| E5 | 0.1 | 0 | 1 |
+| E5 | 0.2 | 0 | 1 |
+| E6 | 0.01 | 0.45 | nan |
+| E6 | 0.02 | 0.565 | nan |
+| E6 | 0.05 | 0.795 | nan |
+| E6 | 0.1 | 0.835 | nan |
+| E6 | 0.2 | 0.85 | nan |
+
+## Which checks react on Online Retail II (share of runs)
+
+| code | variant | C05 | C06 | C08 | C19 | C20 |
+|---|---|---|---|---|---|---|
+| E1 | duplicate_order | 1.00 | 1.00 | 0.00 | 1.00 | 0.91 |
+| E2 | orphan_product | 0.00 | 0.00 | 1.00 | 0.00 | 0.00 |
+| E3 | missing_customer_id | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| E4 | tz_shift_3h | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+| E5 | price_x100 | 0.00 | 0.00 | 0.00 | 0.00 | 0.00 |
+
+## Figures
+
+- `results/figures/fig6_silent_retail.png`
+- `results/figures/fig7_retail_vs_olist.png`
+

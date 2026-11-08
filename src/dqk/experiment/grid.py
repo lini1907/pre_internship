@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel
@@ -39,7 +40,11 @@ class BaselineOptions(BaseModel):
 
 
 class GridConfig(BaseModel):
+    """dataset: 'olist' (warehouse/olist.duckdb) or 'retail' (Online Retail II,
+    warehouse/retail.duckdb, KPI and DQ subsets of src/dqk/retail/kpi_map.yaml)."""
+
     name: str
+    dataset: Literal["olist", "retail"] = "olist"
     rates: list[float]
     n_seeds: int
     errors: list[ErrorEntry]

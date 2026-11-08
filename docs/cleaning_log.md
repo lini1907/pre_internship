@@ -30,3 +30,24 @@ and either pass the DQ checks or form the documented clean baseline.
 
 Clean baseline (`docs/dq_catalogue.md`): mart pass 19, warn 1 (C03), fail 0. Stage B counts
 a run as detected only if a check gets worse than this baseline (decision D3).
+
+## Online Retail II (Stage B, code plan 4.7)
+
+Rules in `sql/retail/stg_retail_lines.sql`, applied in order; row counts are regenerated in
+`docs/retail_adapter.md` by `python -m dqk.retail.adapter`.
+
+| # | Issue | Rows (of 1,067,371) | Handling | Reason |
+|---|---|---|---|---|
+| R1 | Exact duplicate rows | 34,335 | Dropped | The two Excel sheets overlap on 2010-12-01..09; the source also repeats some lines verbatim |
+| R2 | Invoice number not `[C]dddddd` | 6 | Dropped | `A...` bad-debt adjustments, not sales |
+| R3 | Cancellation invoices `C...` | 19,104 | Dropped | Reversals, not orders |
+| R4 | Sale line fully reversed by a cancellation (same customer, StockCode, opposite quantity, later) | 9,579 | Dropped | Without R4, dropping R3 would leave cancelled orders in GMV (e.g. the 80,995-unit line of 2011-12-09) |
+| R5 | Non-product StockCode (POST, DOT, M, BANK CHARGES, AMAZONFEE, ...) | 4,434 | Dropped | Postage, fees and manual adjustments, not products |
+| R6 | Quantity ≤ 0 or Price ≤ 0 | 5,927 | Dropped | Stock corrections and free lines |
+| R7 | Missing Customer ID | 226,637 | Dropped | K9 and K10 need a customer (code plan 4.7) |
+| — | Invoice with several timestamps | 83 invoices | Earliest timestamp, customer of the first line | One purchase time per order |
+| — | Customer in several countries | 13 customers | Country of the latest invoice | Same rule as Olist item 7 |
+| — | StockCode with several descriptions; lower-case suffixes | 1,232 codes | `upper(trim())`; most frequent description kept for reading | One product per code |
+
+Result: 36,267 invoices, 767,349 lines, 5,838 customers, 4,611 products. Every applicable
+check passes on the clean retail mart, so the baseline is all `pass`.

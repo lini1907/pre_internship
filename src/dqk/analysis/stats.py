@@ -49,13 +49,18 @@ class GridResults:
 
 
 def distortion(kpi: pd.DataFrame) -> pd.Series:
+    """A grid without some KPI type (Online Retail II has no decision KPI) lacks that
+    type's measure column; those rows simply do not occur."""
     t = kpi["kpi_type"]
     out = pd.Series(np.nan, index=kpi.index, dtype=float)
-    scalar = t.isin(SCALAR_TYPES)
-    out[scalar] = kpi.loc[scalar, "rel_error"]
-    out[t == "series"] = kpi.loc[t == "series", "series_mapd"]
-    out[t == "ranking"] = 1.0 - kpi.loc[t == "ranking", "topk_overlap"]
-    out[t == "decision"] = kpi.loc[t == "decision", "decision_flip"]
+    for mask, col, f in (
+        (t.isin(SCALAR_TYPES), "rel_error", lambda s: s),
+        (t == "series", "series_mapd", lambda s: s),
+        (t == "ranking", "topk_overlap", lambda s: 1.0 - s),
+        (t == "decision", "decision_flip", lambda s: s),
+    ):
+        if mask.any():
+            out[mask] = f(kpi.loc[mask, col])
     return out
 
 

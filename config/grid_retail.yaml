@@ -1,0 +1,38 @@
+# Online Retail II grid (proposal 6.5 external validity, code plan 4.7).
+# Same rates and seeds as the main grid and, where the source allows, the same variants,
+# so the Olist and Online Retail II results compare cell by cell. MCAR for every error
+# type (the RQ1 comparison), plus the price-dependent MNAR of E5 as in the main grid.
+# E3 uses missing_customer_id (no delivery dates here); E6 does not apply (no categories).
+# KPIs and checks: src/dqk/retail/kpi_map.yaml. Clean mart: python -m dqk.retail.adapter.
+
+name: retail
+dataset: retail
+rates: [0.01, 0.02, 0.05, 0.10, 0.20]
+n_seeds: 200
+
+errors:
+  - code: E1
+    variant: duplicate_order
+    mechanisms:
+      MCAR: {}
+
+  - code: E2
+    variant: orphan_product
+    mechanisms:
+      MCAR: {}
+
+  - code: E3
+    variant: missing_customer_id
+    mechanisms:
+      MCAR: {}
+
+  - code: E4
+    variant: tz_shift_3h
+    mechanisms:
+      MCAR: {}
+
+  - code: E5
+    variant: price_x100
+    mechanisms:
+      MCAR: {}
+      MNAR: {by_value: price, strength: 1.0, log: true}

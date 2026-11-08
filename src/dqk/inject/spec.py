@@ -26,6 +26,7 @@ VARIANT_IDS: dict[str, int] = {
     "price_div100": 11,
     "category_reassign": 12,
     "category_spelling": 13,
+    "missing_customer_id": 14,
 }
 
 

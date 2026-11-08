@@ -4,8 +4,10 @@
 An analytics pipeline on the [Olist Brazilian e-commerce dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
 (Stage A) and a controlled experiment on how injected data errors distort business KPIs (Stage B).
 
-Status: **Stage A done (week A3)** — staging, mart, 15 KPIs, 20 DQ checks, `run_pipeline.py`,
-5-page Power BI dashboard, Stage A tests. Stage B (error injection) starts in week B1.
+Status: **Stage A and Stage B done (tag `v1.0-paper`)** — pipeline, 15 KPIs, 20 DQ checks and
+dashboard (Stage A); error injection E1–E6, main and robustness grids, Online Retail II replication,
+RQ1–RQ3 statistics, tables and figures (Stage B). Every table and figure of the paper is rebuilt by
+`python -m dqk.analysis.make_all`.
 
 ![Dashboard, page 5: data quality](docs/figures/dashboard_5_data_quality.png)
 
@@ -45,6 +47,33 @@ The first run takes about 1.5 minutes including the download; later runs about 1
 
 Exit code 1 if a check fails on the mart (`--allow-fail` to continue).
 
+## Stage B: experiment
+
+```bash
+python run_experiment.py --grid config/grid_main.yaml --workers 8 --resume        # 65 cells x 200 seeds
+python run_experiment.py --grid config/grid_robustness.yaml --workers 8 --resume  # 6 scenarios
+python -m dqk.retail.adapter                                                      # Online Retail II mart
+python run_experiment.py --grid config/grid_retail.yaml --workers 3 --resume      # 30 cells x 200 seeds
+python -m dqk.analysis.make_all                                                   # all tables and figures
+```
+
+Each grid writes `results/runs/<grid>/<cell>.{kpi,dq,runs}.parquet` and `_meta.json` (git commit,
+KPI spec hash, library versions). `--resume` skips finished cells; a pilot is
+`--cell <cell_id> --seeds 5`. Measured wall time on a 12-thread laptop with 8 GB RAM: main grid
+96 min (10 workers), robustness 2 h (10 workers), Online Retail II 67 min
+(3 workers: each worker holds the 770k-line retail mart, 10 workers ran out of memory).
+`make_all` takes a few minutes (`--n-boot 200` for a quick check) and writes:
+
+- `results/tables/summary.md` — every result with its table; `paper_tables.md` — tables P1–P2 for the paper
+- `results/tables/t*.csv` main grid, `r*.csv` robustness, `x*.csv` Online Retail II, `p*.csv` paper summary
+- `results/figures/fig1`–`fig7` (PNG, 300 dpi, each with the CSV it is drawn from)
+
+**Online Retail II** (UCI, CC BY 4.0) is loaded into the same mart schema as Olist (one invoice =
+one delivered order, line revenue in `price`, StockCode in place of category, Country in place of
+state), so the frozen KPI queries, DQ checks and injectors run unchanged. Which KPIs and checks apply,
+and why the others do not: `src/dqk/retail/kpi_map.yaml`; cleaning rules with row counts:
+`docs/retail_adapter.md`.
+
 ## Check that your build matches
 
 A clean clone, set up as above, was tested on 2026-11-08: `python run_pipeline.py` exits 0,
@@ -73,12 +102,16 @@ Screenshots of the five pages are in `docs/figures/dashboard_*.png` (PDF: `docs/
 | `python -m dqk.dq docs` | `docs/dq_catalogue.md` |
 | `python -m dqk.powerbi` | `powerbi/Olist.pbip` — 5-page Power BI dashboard on `exports/` (`docs/dashboard.md`) |
 | `python -m dqk.diagrams` | `docs/star_schema.png` |
+| `python -m dqk.retail.adapter` | `warehouse/retail.duckdb`, `docs/retail_adapter.md` (downloads the UCI file on first run) |
+| `python -m dqk.analysis.make_all` | `results/tables/*`, `results/figures/*` |
 | `pytest` | all tests; `pytest -m "not slow"` skips the reconciliation on real data |
 
 ## Layout
 
 ```
 run_pipeline.py         Stage A in one command
+run_experiment.py       Stage B: run a grid of error-injection cells
+config/grid_*.yaml      main grid, robustness scenarios, Online Retail II grid
 config/kpi_spec.yaml    15 KPIs, parameters and the 5 decisions fixed before Stage B
 config/kpi_spec.lock    SHA-256 of the spec and every sql/kpi file
 config/dq_checks.yaml   20 checks: dimension, layers, warn/fail thresholds, reference row counts
@@ -87,11 +120,18 @@ sql/staging/            one query per source table (casts, renames, one row per 
 sql/mart/               star schema: fact_orders, fact_order_items, dim_*
 sql/kpi/                one query per KPI, returns (item, value, rank)
 sql/dq/                 one query per check, returns (n_failed, n_total); {{table}} placeholders per layer
+sql/retail/             Online Retail II staging and mart in the Olist schema
 src/dqk/                io, db, tables, pipeline, kpis, dq, export, config, profiling, diagrams
+src/dqk/inject/         E1-E6 injectors, unit sampling (MCAR / MAR / MNAR, nested rates)
+src/dqk/experiment/     grid expansion, runner (parallel, resume), distortion and detection measures
+src/dqk/analysis/       statistics (Friedman, Spearman + cluster bootstrap, Wilson), figures, make_all
+src/dqk/retail/         Online Retail II adapter and kpi_map.yaml
 docs/                   profiling report, KPI spec, DQ catalogue, cleaning log, dashboard spec, star schema
-tests/                  KPI, DQ (planted errors), staging/mart rules, reconciliation against raw
+tests/                  KPI, DQ (planted errors), staging/mart rules, reconciliation against raw,
+                        sampling, injectors, measures, Online Retail II adapter
 ```
 
 ## License
 
-Code: MIT. Data outputs derived from Olist: CC BY-NC-SA 4.0, as the source data.
+Code: MIT. Data outputs derived from Olist: CC BY-NC-SA 4.0, as the source data. Outputs derived
+from Online Retail II (Chen, 2012, UCI Machine Learning Repository): CC BY 4.0.

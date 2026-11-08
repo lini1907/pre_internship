@@ -292,7 +292,9 @@ def fig_dq_vs_distortion(
 # ------------------------------------------------------------ 4. RQ3 silent rate
 
 
-def fig_silent(rq3: pd.DataFrame, out: Path, name: str = "fig4_silent_rate") -> Path:
+def fig_silent(
+    rq3: pd.DataFrame, out: Path, name: str = "fig4_silent_rate", title: str | None = None
+) -> Path:
     """Silent-error rate with Wilson 95 % CI per error type across rates (RQ3)."""
     fig, ax = plt.subplots(figsize=(7, 3.6))
     codes = sorted(rq3["code"].unique())
@@ -304,7 +306,10 @@ def fig_silent(rq3: pd.DataFrame, out: Path, name: str = "fig4_silent_rate") -> 
         ax.errorbar(
             x,
             s["silent_rate"],
-            yerr=[s["silent_rate"] - s["silent_lo"], s["silent_hi"] - s["silent_rate"]],
+            yerr=[  # clip: at a rate of 0 or 1 the Wilson bound can miss it by ~1e-16
+                (s["silent_rate"] - s["silent_lo"]).clip(lower=0),
+                (s["silent_hi"] - s["silent_rate"]).clip(lower=0),
+            ],
             color=CODE_COLOR[c],
             marker=CODE_MARKER[c],
             ms=6,
@@ -342,7 +347,8 @@ def fig_silent(rq3: pd.DataFrame, out: Path, name: str = "fig4_silent_rate") -> 
     ax.set_ylabel("share of runs that are silent")
     tau = rq3["tau"].iloc[0]
     ax.set_title(
-        f"RQ3: material KPI change (τ = {tau:g}) that no DQ check flags "
+        title
+        or f"RQ3: material KPI change (τ = {tau:g}) that no DQ check flags "
         "(mechanisms pooled, Wilson 95 % CI)",
         loc="left",
         fontsize=9.5,
@@ -351,4 +357,54 @@ def fig_silent(rq3: pd.DataFrame, out: Path, name: str = "fig4_silent_rate") -> 
     return _save(fig, out, name, rq3)
 
 
-__all__ = ["fig_dq_vs_distortion", "fig_heatmap", "fig_rate_lines", "fig_silent"]
+# ------------------------------------------------------------ 5. Olist vs Online Retail II
+
+
+def fig_dataset_compare(cmp: pd.DataFrame, out: Path, kpis=("K1", "K10", "K14")) -> Path:
+    """Median distortion per error type and rate, Olist (solid) vs Online Retail II
+    (dashed), MCAR. ``cmp`` is the x2 table of make_all (one row per code x rate x KPI)."""
+    fig, axes = plt.subplots(1, len(kpis), figsize=(3.2 * len(kpis), 3.2), sharex=True)
+    codes = sorted(cmp["code"].unique())
+    for ax, k in zip(np.atleast_1d(axes), kpis, strict=True):
+        d = cmp[cmp["kpi_id"] == k]
+        for c in codes:
+            s = d[d["code"] == c].sort_values("rate")
+            for col, ls in (("olist_median", "-"), ("retail_median", "--")):
+                y = s[col].clip(lower=1e-6)
+                ax.plot(
+                    s["rate"],
+                    y,
+                    ls=ls,
+                    color=CODE_COLOR[c],
+                    marker=CODE_MARKER[c],
+                    ms=4,
+                    lw=1.6,
+                    mec="white",
+                    mew=0.6,
+                )
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xticks([0.01, 0.02, 0.05, 0.1, 0.2], ["1%", "2%", "5%", "10%", "20%"])
+        ax.minorticks_off()
+        ax.set_ylim(5e-7, None)
+        ax.set_title(k, loc="left", fontsize=10)
+        ax.set_xlabel("error rate")
+    np.atleast_1d(axes)[0].set_ylabel("median distortion (log)")
+    fig.suptitle(
+        "Olist (solid) vs Online Retail II (dashed), MCAR; values ≤ 1e-6 drawn at 1e-6",
+        x=0.01,
+        ha="left",
+        fontsize=9.5,
+    )
+    _legend_codes(fig, codes, loc="lower center", ncol=len(codes), bbox_to_anchor=(0.5, -0.06))
+    fig.tight_layout(rect=(0, 0.05, 1, 0.95))
+    return _save(fig, out, "fig7_retail_vs_olist", cmp[cmp["kpi_id"].isin(kpis)])
+
+
+__all__ = [
+    "fig_dataset_compare",
+    "fig_dq_vs_distortion",
+    "fig_heatmap",
+    "fig_rate_lines",
+    "fig_silent",
+]

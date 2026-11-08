@@ -3,6 +3,8 @@
 missing_delivery_date  fact_orders.delivered_customer_ts -> NULL   (unit: order)
 missing_review_score   fact_orders.review_score -> NULL            (unit: order)
 missing_category       dim_product.category_pt/category_en -> NULL (unit: product)
+missing_customer_id    fact_orders.customer_unique_id -> NULL      (unit: order; used on
+                       Online Retail II, which has no delivery dates)
 """
 
 from __future__ import annotations
@@ -14,10 +16,16 @@ import pandas as pd
 from dqk.inject._common import order_units
 from dqk.tables import Mart
 
-VARIANTS = ("missing_delivery_date", "missing_review_score", "missing_category")
+VARIANTS = (
+    "missing_delivery_date",
+    "missing_review_score",
+    "missing_category",
+    "missing_customer_id",
+)
 _ORDER_COL = {
     "missing_delivery_date": "delivered_customer_ts",
     "missing_review_score": "review_score",
+    "missing_customer_id": "customer_unique_id",
 }
 
 

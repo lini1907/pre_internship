@@ -25,7 +25,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from dqk import RESULTS_DIR, __version__  # noqa: E402
 from dqk.config import KPI_LOCK, check_lock  # noqa: E402
 from dqk.experiment.grid import expand, load_grids  # noqa: E402
-from dqk.experiment.runner import WAREHOUSE, run_cells  # noqa: E402
+from dqk.experiment.runner import dataset_setup, run_cells  # noqa: E402
+from dqk.retail.adapter import kpi_map_hash  # noqa: E402
 
 
 def _git_commit() -> str | None:
@@ -71,11 +72,14 @@ def main(argv: list[str] | None = None) -> int:
         print("KPI spec changed since freeze (re-run old results if you continue):")
         print("  " + "\n  ".join(changed))
         return 1
-    if not WAREHOUSE.exists():
-        print(f"{WAREHOUSE} not found: run python run_pipeline.py first")
-        return 1
-
     grids = load_grids(args.grid)
+    for ds in {g.dataset for g in grids}:
+        warehouse = dataset_setup(ds)[0]
+        if not warehouse.exists():
+            build = "python run_pipeline.py" if ds == "olist" else "python -m dqk.retail.adapter"
+            print(f"{warehouse} not found: run {build} first")
+            return 1
+
     if args.out and len(grids) > 1:
         print("--out needs a single-grid file (this one has scenarios)")
         return 2
@@ -94,7 +98,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"grid {grid.name}: {len(cells)} cells x {len(seeds)} seeds -> {out}")
         t = time.perf_counter()
         run_cells(
-            cells, seeds, out, workers=args.workers, resume=args.resume, options=grid.baseline
+            cells,
+            seeds,
+            out,
+            workers=args.workers,
+            resume=args.resume,
+            options=grid.baseline,
+            dataset=grid.dataset,
         )
         seconds = time.perf_counter() - t
 
@@ -104,6 +114,7 @@ def main(argv: list[str] | None = None) -> int:
             "seconds": round(seconds, 1),
             "grid": str(args.grid),
             "grid_name": grid.name,
+            "dataset": grid.dataset,
             "baseline": grid.baseline.model_dump(),
             "cells": [c.cell_id for c in cells],
             "n_seeds": len(seeds),
@@ -111,6 +122,7 @@ def main(argv: list[str] | None = None) -> int:
             "git_commit": _git_commit(),
             "kpi_spec_hash": json.loads(KPI_LOCK.read_text(encoding="utf-8"))["spec_hash"],
             "kpi_spec_matches_lock": not changed,
+            **({"kpi_map_hash": kpi_map_hash()} if grid.dataset == "retail" else {}),
             "versions": _versions(),
         }
         (out / "_meta.json").write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")

@@ -1,0 +1,6 @@
+code,variant,C05,C06,C08,C19,C20
+E1,duplicate_order,1.0,1.0,0.0,1.0,0.906
+E2,orphan_product,0.0,0.0,1.0,0.0,0.0
+E3,missing_customer_id,0.0,0.0,0.0,0.0,0.0
+E4,tz_shift_3h,0.0,0.0,0.0,0.0,0.0
+E5,price_x100,0.0,0.0,0.0,0.0,0.0

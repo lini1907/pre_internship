@@ -1,0 +1,74 @@
+# Online Retail II as a second dataset (code plan 4.7).
+#
+# The adapter loads the UCI file into the same mart schema as Olist (dqk.tables.MART_SCHEMA),
+# so the frozen KPI queries (sql/kpi/), the DQ checks (sql/dq/) and the error injectors
+# run unchanged. This file says which of them apply and with which parameters.
+#
+# Mapping of the source onto the mart (sql/retail/):
+#   fact_orders       one row per invoice; every kept invoice is a delivered order;
+#                     no delivery dates, payments or reviews (NULL)
+#   fact_order_items  one row per invoice line; price = Quantity x Price (line revenue);
+#                     one synthetic seller; freight 0
+#   dim_customer      Customer ID; state = Country
+#   dim_product       StockCode; category_en = StockCode (no categories in the source),
+#                     category_pt = most frequent Description
+
+version: 1
+
+source:
+  url: https://archive.ics.uci.edu/static/public/502/online+retail+ii.zip
+  file: online_retail_II.xlsx
+  license: CC BY 4.0
+  citation: Chen, D. (2012). Online Retail II [Dataset]. UCI Machine Learning Repository.
+
+# Overrides of kpi_spec.yaml params. 2011-12 has only 9 days and is left out.
+kpi_params:
+  window_start: 2009-12-01
+  window_end: 2011-12-01
+
+# KPIs computed on Online Retail II, with what they measure there.
+kpis:
+  - {id: K1, retail: "GMV (sum of Quantity x Price, kept invoices)"}
+  - {id: K2, retail: "number of invoices"}
+  - {id: K3, retail: "average invoice value"}
+  - {id: K9, retail: "repeat customer rate (Customer ID with >= 2 invoices)"}
+  - {id: K10, retail: "active customers (distinct Customer ID)"}
+  - {id: K11, retail: "top-10 products (StockCode) by GMV"}
+  - {id: K13, retail: "top-5 countries by GMV"}
+  - {id: K14, retail: "monthly GMV series"}
+
+not_applicable:
+  K4: no freight
+  K5: no delivery or estimated dates
+  K6: no delivery dates
+  K7: no reviews
+  K8: no reviews
+  K12: a single retailer, no sellers
+  K15: no reviews, no categories
+
+dq:
+  # Overrides of dq_checks.yaml params.
+  params:
+    data_start: 2009-12-01
+    data_end: 2011-12-10
+    valid_states: []
+  # Row counts of the clean reference load (python -m dqk.retail.adapter, 2026-11-09).
+  reference_rows:
+    mart: {orders: 36267, items: 767349}
+  checks: [C01, C02, C05, C06, C08, C10, C11, C17, C19, C20]
+  not_applicable:
+    C03: no delivery dates
+    C04: no reviews
+    C07: no reviews
+    C09: a single synthetic seller
+    C12: no freight
+    C13: no reviews
+    C14: countries, not Brazilian states
+    C15: no approval timestamps
+    C16: no delivery dates
+    C18: no independent payment record to reconcile against
+
+# Error types: E1-E5 apply; E6 does not (no categories). E3 uses missing_customer_id,
+# since the main variant (missing_delivery_date) has no target column here.
+errors_not_applicable:
+  E6: no categories

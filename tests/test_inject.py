@@ -89,7 +89,11 @@ def test_e2(synth_mart, variant, col, dim):
 
 @pytest.mark.parametrize(
     "variant,col",
-    [("missing_delivery_date", "delivered_customer_ts"), ("missing_review_score", "review_score")],
+    [
+        ("missing_delivery_date", "delivered_customer_ts"),
+        ("missing_review_score", "review_score"),
+        ("missing_customer_id", "customer_unique_id"),
+    ],
 )
 def test_e3_orders(synth_mart, variant, col):
     out, log = _inject(synth_mart, "E3", variant)

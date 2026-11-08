@@ -1,9 +1,11 @@
 """Rebuild every result table and figure from results/runs/ in one command.
 
-    python -m dqk.analysis.make_all                # main grid + robustness (if present)
+    python -m dqk.analysis.make_all                # main + robustness + retail (if present)
     python -m dqk.analysis.make_all --n-boot 200   # quick check
 
-Writes results/tables/*.csv, results/tables/summary.md and results/figures/*.png.
+Writes results/tables/*.csv, results/tables/summary.md, results/tables/paper_tables.md
+and results/figures/*.png. Table prefixes: t = main grid, r = robustness, x = Online
+Retail II, p = summary tables for the paper.
 """
 
 from __future__ import annotations
@@ -276,12 +278,214 @@ def robustness(root: Path, main, n_boot: int) -> list[str]:
     return md
 
 
+# Online Retail II: KPIs it shares with Olist; for RQ1 the continuous ones (code plan 4.7).
+RETAIL_RQ1_KPIS = ["K1", "K2", "K3", "K9", "K10", "K14"]
+RETAIL_SHARED_KPIS = RETAIL_RQ1_KPIS + ["K11", "K13"]
+
+
+def _ci(lo: float, hi: float) -> str:
+    return f"[{lo:.2f}, {hi:.2f}]"
+
+
+def retail(folder: Path, main, n_boot: int) -> tuple[list[str], dict]:
+    """Online Retail II vs Olist: the same analyses, MCAR cells compared like for like."""
+    r = load_results(folder)
+    md = [
+        "\n# Online Retail II (code plan 4.7)\n",
+        f"{r.runs['cell_id'].nunique()} cells, {len(r.runs)} runs. KPIs "
+        f"{', '.join(RETAIL_SHARED_KPIS)}; E3 = missing_customer_id (Olist main grid: "
+        "missing_delivery_date); E6 not applicable. Mapping: `docs/retail_adapter.md`.\n",
+    ]
+    desc = describe_cells(r.kpi)
+    desc.to_csv(TABLES / "x1_retail_describe.csv", index=False)
+
+    keys = ["code", "rate", "kpi_id"]
+    o = describe_cells(main.kpi)
+    o = o[(o["mechanism"] == "MCAR") & o["kpi_id"].isin(RETAIL_SHARED_KPIS)]
+    x = desc[desc["mechanism"] == "MCAR"]
+    cmp = o[keys + ["variant", "median"]].merge(
+        x[keys + ["variant", "median"]], on=keys, suffixes=("_olist", "_retail")
+    )
+    cmp = cmp.rename(columns={"median_olist": "olist_median", "median_retail": "retail_median"})
+    cmp = cmp[
+        [
+            "code",
+            "variant_olist",
+            "variant_retail",
+            "rate",
+            "kpi_id",
+            "olist_median",
+            "retail_median",
+        ]
+    ]
+    cmp.to_csv(TABLES / "x2_retail_vs_olist_kpi.csv", index=False)
+    at5 = cmp[cmp["rate"] == 0.05].pivot_table(
+        index="code", columns="kpi_id", values=["olist_median", "retail_median"]
+    )
+    at5.columns = [f"{k} {'O' if v.startswith('olist') else 'R'}" for v, k in at5.columns]
+    at5 = at5[[c for k in RETAIL_SHARED_KPIS for c in (f"{k} O", f"{k} R") if c in at5]]
+
+    rq1 = {
+        "olist (E1-E5)": rq1_friedman(main.kpi[main.kpi["code"] != "E6"], kpis=RETAIL_RQ1_KPIS),
+        "retail": rq1_friedman(r.kpi, kpis=RETAIL_RQ1_KPIS),
+    }
+    ranks = pd.concat(
+        [
+            v["ranks"].assign(
+                dataset=k,
+                kendall_w=v["tests"].iloc[0]["kendall_w"],
+                p=v["tests"].iloc[0]["p"],
+                n_blocks=int(v["tests"].iloc[0]["n_blocks"]),
+                n_tied=v["n_blocks_all_tied"],
+            )
+            for k, v in rq1.items()
+        ],
+        ignore_index=True,
+    )
+    ranks.to_csv(TABLES / "x3_rq1_retail_vs_olist.csv", index=False)
+    rq1["retail"]["tests"].to_csv(TABLES / "x3b_rq1_retail_friedman.csv", index=False)
+
+    shared = main.kpi[main.kpi["kpi_id"].isin(RETAIL_SHARED_KPIS)]
+    rho = pd.concat(
+        [
+            rq2_spearman(main.runs, shared, n_boot=n_boot).assign(dataset="olist"),
+            rq2_spearman(r.runs, r.kpi, n_boot=n_boot).assign(dataset="retail"),
+        ],
+        ignore_index=True,
+    )
+    rho.to_csv(TABLES / "x4_rq2_retail_vs_olist.csv", index=False)
+
+    silent = pd.concat(
+        [
+            rq3_silent(
+                d[d["mechanism"] == "MCAR"].assign(dataset=name),
+                by=("dataset", "code", "rate"),
+                tau=0.01,
+            )
+            for name, d in (("olist", main.runs), ("retail", r.runs))
+        ],
+        ignore_index=True,
+    )
+    silent.to_csv(TABLES / "x5_rq3_silent_retail_vs_olist.csv", index=False)
+    det = detecting_checks(r.runs)
+    det.reset_index().to_csv(TABLES / "x6_retail_detecting_checks.csv", index=False)
+
+    figs = [
+        F.fig_silent(
+            rq3_silent(r.runs, by=("code", "rate"), tau=0.01),
+            FIGS,
+            "fig6_silent_retail",
+            "Online Retail II, RQ3: material KPI change (τ = 0.01) that no DQ check flags "
+            "(mechanisms pooled, Wilson 95 % CI)",
+        ),
+        F.fig_dataset_compare(cmp, FIGS),
+    ]
+    w = ", ".join(
+        f"{k} {v['tests'].iloc[0]['kendall_w']:.2f} (p = {v['tests'].iloc[0]['p']:.2g})"
+        for k, v in rq1.items()
+    )
+    md += [
+        "## Median distortion at 5 % (MCAR), Olist (O) vs Online Retail II (R)\n",
+        "Scalar: relative error; K14: MAPD; K11/K13: 1 − top-k overlap.\n",
+        _md(at5.reset_index()),
+        "\n## RQ1 on the KPIs both datasets share (MCAR, E1–E5)\n",
+        _md(ranks.pivot_table(index="code", columns="dataset", values="mean_rank").reset_index()),
+        f"\nKendall's W: {w}\n",
+        "## RQ2 ρ (DQ score drop vs distortion), shared KPIs\n",
+        _md(rho.pivot_table(index="group", columns="dataset", values="rho").reset_index()),
+        "\n## RQ3 silent rate (MCAR, τ = 0.01)\n",
+        _md(
+            silent.pivot_table(
+                index=["code", "rate"], columns="dataset", values="silent_rate"
+            ).reset_index()
+        ),
+        "\n## Which checks react on Online Retail II (share of runs)\n",
+        _md(det.reset_index(), ".2f"),
+        "\n## Figures\n",
+    ]
+    md += [f"- `{p.relative_to(RESULTS_DIR.parent).as_posix()}`" for p in figs] + [""]
+    return md, {"runs": r.runs, "rq1": rq1, "rho": rho}
+
+
+def _per_code(runs: pd.DataFrame, ranks: pd.DataFrame, name: str) -> pd.DataFrame:
+    s = rq3_silent(runs[runs["mechanism"] == "MCAR"], by=("code",), tau=0.01).set_index("code")
+    return pd.DataFrame(
+        {
+            f"{name}_rq1_rank": ranks.set_index("code")["mean_rank"],
+            f"{name}_detected": s["detected_rate"],
+            f"{name}_material": s["material_rate"],
+            f"{name}_silent": s["silent_rate"],
+            f"{name}_silent_lo": s["silent_lo"],
+            f"{name}_silent_hi": s["silent_hi"],
+        }
+    )
+
+
+def paper_tables(main, ret: dict | None) -> list[str]:
+    """Compact tables for the paper (P1 error types, P2 RQ2), written as CSV and Markdown.
+    Built from tables written earlier in the same make_all run."""
+    p1 = _per_code(main.runs, pd.read_csv(TABLES / "t2_rq1_mean_ranks.csv"), "olist")
+    if ret is not None:
+        p1 = p1.join(_per_code(ret["runs"], ret["rq1"]["retail"]["ranks"], "retail"))
+    p1 = p1.reset_index()
+    p1.to_csv(TABLES / "p1_error_summary.csv", index=False)
+
+    cols = ["group", "rho", "ci_lo", "ci_hi", "p_holm"]
+    p2 = pd.read_csv(TABLES / "t3_rq2_spearman.csv")[cols].add_prefix("olist_")
+    p2 = p2.rename(columns={"olist_group": "group"})
+    if ret is not None:
+        rr = ret["rho"][ret["rho"]["dataset"] == "retail"][cols].add_prefix("retail_")
+        p2 = p2.merge(rr.rename(columns={"retail_group": "group"}), on="group", how="left")
+    p2.to_csv(TABLES / "p2_rq2_summary.csv", index=False)
+
+    show1, show2 = p1.copy(), p2.copy()
+    for d in ("olist", "retail"):
+        if f"{d}_silent" in show1:
+            show1[f"{d}_silent"] = [
+                f"{s:.2f} {_ci(lo, hi)}"
+                for s, lo, hi in show1[
+                    [f"{d}_silent", f"{d}_silent_lo", f"{d}_silent_hi"]
+                ].itertuples(index=False)
+            ]
+            show1 = show1.drop(columns=[f"{d}_silent_lo", f"{d}_silent_hi"])
+        if f"{d}_rho" in show2:
+            show2[f"{d}_rho"] = [
+                f"{x:.2f} {_ci(lo, hi)}" if np.isfinite(x) else "n/a"
+                for x, lo, hi in show2[[f"{d}_rho", f"{d}_ci_lo", f"{d}_ci_hi"]].itertuples(
+                    index=False
+                )
+            ]
+            show2 = show2.drop(columns=[f"{d}_ci_lo", f"{d}_ci_hi"])
+    return [
+        "# Summary tables for the paper\n",
+        "Generated by `python -m dqk.analysis.make_all`. Do not edit.\n",
+        "## Table P1: error types (MCAR cells, all rates pooled, τ = 0.01)\n",
+        "rq1_rank: Friedman mean rank, 1 = least distortion (Olist: K1–K10 + K14, E1–E6; "
+        "Online Retail II: K1–K3, K9, K10, K14, E1–E5). detected / material / silent: share "
+        "of runs; silent with Wilson 95 % CI.\n",
+        _md(show1, ".2f"),
+        "\n## Table P2: RQ2, Spearman ρ between DQ score drop and distortion per KPI group\n",
+        "All runs of each dataset (Olist: all 15 KPIs); 95 % cluster-bootstrap CI (cells "
+        "resampled); p Holm-adjusted; n/a = constant input (no ρ). Online Retail II has no "
+        "duration, score or decision KPIs; its rate group is K9 only.\n",
+        _md(show2, ".3g"),
+        "",
+    ]
+
+
 def run(n_boot: int = 2000) -> Path:
     TABLES.mkdir(parents=True, exist_ok=True)
     FIGS.mkdir(parents=True, exist_ok=True)
     md, main = main_grid(RUNS / "main", n_boot)
     if (RUNS / "robustness").exists():
         md += robustness(RUNS / "robustness", main, n_boot)
+    ret = None
+    if any((RUNS / "retail").glob("*.runs.parquet")):
+        md_r, ret = retail(RUNS / "retail", main, n_boot)
+        md += md_r
+    (TABLES / "paper_tables.md").write_text(
+        "\n".join(paper_tables(main, ret)) + "\n", encoding="utf-8"
+    )
     out = TABLES / "summary.md"
     out.write_text("\n".join(md) + "\n", encoding="utf-8")
     return out
