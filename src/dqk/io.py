@@ -72,7 +72,7 @@ def build_manifest(src: Path = OLIST_DIR) -> dict:
 
 def write_manifest(src: Path = OLIST_DIR, out: Path = MANIFEST) -> dict:
     manifest = build_manifest(src)
-    out.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    out.write_text(json.dumps(manifest, indent=2), encoding="utf-8", newline="\n")
     return manifest
 
 

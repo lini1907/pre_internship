@@ -111,7 +111,9 @@ def main(argv: list[str] | None = None) -> int:
         for layer, tables in [("raw", raw), ("staging", staging), ("mart", mart.as_tables())]
     }
     seconds = time.perf_counter() - t0
-    (OUT / "run_meta.json").write_text(json.dumps(_meta(seconds, counts), indent=2), "utf-8")
+    (OUT / "run_meta.json").write_text(
+        json.dumps(_meta(seconds, counts), indent=2), "utf-8", newline="\n"
+    )
 
     print("Rows per layer:")
     for layer, c in counts.items():

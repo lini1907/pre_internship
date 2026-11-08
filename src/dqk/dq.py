@@ -201,7 +201,7 @@ def render_catalogue(config: DqConfig, baseline: pd.DataFrame | None = None) -> 
 def write_catalogue(results_csv: Path = RESULTS_DIR / "stage_a" / "dq_results.csv") -> Path:
     baseline = pd.read_csv(results_csv) if results_csv.exists() else None
     path = DOCS_DIR / "dq_catalogue.md"
-    path.write_text(render_catalogue(load_dq_config(), baseline), encoding="utf-8")
+    path.write_text(render_catalogue(load_dq_config(), baseline), encoding="utf-8", newline="\n")
     return path
 
 

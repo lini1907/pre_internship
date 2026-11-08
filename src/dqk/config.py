@@ -115,7 +115,7 @@ def freeze(lock: Path = KPI_LOCK) -> dict:
         "spec_hash": _combined(hashes),
         "files": hashes,
     }
-    lock.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    lock.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8", newline="\n")
     return payload
 
 
@@ -162,7 +162,7 @@ def render_kpi_doc(spec: KpiSpec) -> str:
 
 def write_kpi_doc() -> Path:
     path = DOCS_DIR / "kpi_spec.md"
-    path.write_text(render_kpi_doc(load_kpi_spec()), encoding="utf-8")
+    path.write_text(render_kpi_doc(load_kpi_spec()), encoding="utf-8", newline="\n")
     return path
 
 

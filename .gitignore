@@ -10,5 +10,6 @@ results/stage_a/
 !results/tables/
 !results/figures/
 exports/
-powerbi/**/.pbi/localSettings.json
-powerbi/**/.pbi/cache.abf
+powerbi/**/.pbi/
+powerbi/**/diagramLayout.json
+*.egg-info/

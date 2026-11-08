@@ -4,15 +4,22 @@
 An analytics pipeline on the [Olist Brazilian e-commerce dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
 (Stage A) and a controlled experiment on how injected data errors distort business KPIs (Stage B).
 
-Status: **week A2 done** — staging, mart, 15 KPIs, 20 DQ checks, `run_pipeline.py`,
-exports for the dashboard, Stage A tests. Stage B (error injection) starts in week B1.
+Status: **Stage A done (week A3)** — staging, mart, 15 KPIs, 20 DQ checks, `run_pipeline.py`,
+5-page Power BI dashboard, Stage A tests. Stage B (error injection) starts in week B1.
+
+![Dashboard, page 5: data quality](docs/figures/dashboard_5_data_quality.png)
 
 ## Setup
 
+Requires Python 3.12 and internet access to kaggle.com on the first run.
+
 ```bash
+git clone <repo-url> olist-dq-kpi && cd olist-dq-kpi
 python -m venv .venv
-.venv\Scripts\activate          # Windows; on macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
+.venv\Scripts\activate              # Windows cmd / PowerShell
+# source .venv/Scripts/activate     # Windows Git Bash
+# source .venv/bin/activate         # macOS / Linux
+pip install -r requirements.txt     # a few minutes: duckdb, pyarrow, pandas, scipy, matplotlib
 pip install -e .
 ```
 
@@ -28,7 +35,8 @@ python run_pipeline.py                       # download if missing -> raw -> DQ 
 python run_pipeline.py --skip-download --no-export
 ```
 
-About 10 seconds once the data is downloaded. Output:
+The first run takes about 1.5 minutes including the download; later runs about 10 seconds
+(measured on a laptop, 2026-11-08). Output:
 
 - `warehouse/olist.duckdb` — schemas `raw`, `staging`, `mart`, `results`
 - `results/stage_a/dq_results.csv`, `kpis_clean.csv`, `run_meta.json` (git commit, KPI spec hash, library versions)
@@ -36,6 +44,24 @@ About 10 seconds once the data is downloaded. Output:
 - `docs/dq_catalogue.md` — check catalogue with the clean baseline
 
 Exit code 1 if a check fails on the mart (`--allow-fail` to continue).
+
+## Check that your build matches
+
+A clean clone, set up as above, was tested on 2026-11-08: `python run_pipeline.py` exits 0,
+`pytest` gives 60 passed, `python -m dqk.config check` prints "KPI spec matches lock", and
+`results/stage_a/kpis_clean.csv` and `dq_results.csv` equal the reference build to 1e-9.
+Quick check of your own build: mart DQ = 19 pass, 1 warn (C03), 0 fail; K1 GMV =
+13,181,027.13 BRL; K2 delivered orders = 96,211 (more values in `docs/dashboard.md`).
+
+## Dashboard
+
+```bash
+python -m dqk.powerbi          # writes powerbi/Olist.pbip with ExportsFolder = your exports folder
+```
+
+Open `powerbi/Olist.pbip` in Power BI Desktop (free) and press **Refresh**. Always run
+`python -m dqk.powerbi` after cloning: the committed project points at the author's folder.
+Screenshots of the five pages are in `docs/figures/dashboard_*.png` (PDF: `docs/figures/dashboard.pdf`).
 
 ## Other commands
 

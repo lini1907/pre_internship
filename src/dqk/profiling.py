@@ -361,7 +361,7 @@ def render_report(p: dict) -> str:
 def main() -> None:
     ensure_olist()
     p = profile(load_raw())
-    (DOCS_DIR / "profiling_report.md").write_text(render_report(p), encoding="utf-8")
+    (DOCS_DIR / "profiling_report.md").write_text(render_report(p), encoding="utf-8", newline="\n")
     out = RESULTS_DIR / "stage_a"
     out.mkdir(parents=True, exist_ok=True)
     (out / "profiling.json").write_text(
@@ -376,6 +376,7 @@ def main() -> None:
             default=str,
         ),
         encoding="utf-8",
+        newline="\n",
     )
     print(f"Wrote {DOCS_DIR / 'profiling_report.md'}")
 

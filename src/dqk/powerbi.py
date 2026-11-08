@@ -322,7 +322,9 @@ def write_model(root: Path, exports: Path) -> None:
         },
     )
     _platform(sm, "SemanticModel")
-    (d / "database.tmdl").write_text("database\n\tcompatibilityLevel: 1567\n\n", "utf-8")
+    (d / "database.tmdl").write_text(
+        "database\n\tcompatibilityLevel: 1567\n\n", "utf-8", newline="\n"
+    )
     tables = list(COLUMNS)
     model = [
         "model Model",
@@ -338,7 +340,7 @@ def write_model(root: Path, exports: Path) -> None:
         *[f"ref table {t}" for t in tables],
         "",
     ]
-    (d / "model.tmdl").write_text("\n".join(model), "utf-8")
+    (d / "model.tmdl").write_text("\n".join(model), "utf-8", newline="\n")
     folder = str(exports.resolve()).rstrip("\\/") + "\\"
     (d / "expressions.tmdl").write_text(
         f'expression ExportsFolder = "{folder}" meta [IsParameterQuery=true, Type="Text", '
@@ -346,6 +348,7 @@ def write_model(root: Path, exports: Path) -> None:
         f"\tlineageTag: {_tag('e', 'ExportsFolder')}\n\n"
         "\tannotation PBI_ResultType = Text\n\n",
         "utf-8",
+        newline="\n",
     )
     rel = []
     for ft, fc, tt, tc in RELATIONSHIPS:
@@ -355,9 +358,9 @@ def write_model(root: Path, exports: Path) -> None:
             f"\ttoColumn: {tt}.{tc}",
             "",
         ]
-    (d / "relationships.tmdl").write_text("\n".join(rel), "utf-8")
+    (d / "relationships.tmdl").write_text("\n".join(rel), "utf-8", newline="\n")
     for t in tables:
-        (d / "tables" / f"{t}.tmdl").write_text(table_tmdl(t, window), "utf-8")
+        (d / "tables" / f"{t}.tmdl").write_text(table_tmdl(t, window), "utf-8", newline="\n")
 
 
 # ---------------------------------------------------------------- report
@@ -409,6 +412,8 @@ def visual(name, vtype, x, y, w, h, buckets, title=None, sort=None, z=0):
             "sort": [{"field": field, "direction": direction}],
             "isDefaultSort": True,
         }
+    if vtype == "tableEx":  # a total row would add up scores and shares, which means nothing
+        v["objects"] = {"total": [{"properties": {"totals": _lit("false")}}]}
     if title:
         v["visualContainerObjects"] = {
             "title": [{"properties": {"show": _lit("true"), "text": _lit(f"'{title}'")}}]
@@ -746,7 +751,7 @@ def write_report(root: Path) -> None:
 
 def _json(path: Path, obj) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(obj, indent=2) + "\n", "utf-8")
+    path.write_text(json.dumps(obj, indent=2) + "\n", "utf-8", newline="\n")
 
 
 def _platform(folder: Path, kind: str) -> None:

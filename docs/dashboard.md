@@ -64,4 +64,17 @@ Page 5 links Stage A to Stage B: it shows the clean baseline that Stage B compar
 | K13 top state | SP (5,057,382 BRL) |
 | K15 worst-rated category | office_furniture (3.63) |
 
-Screenshots for the report are taken in week A3.
+## Screenshots (week A3)
+
+Exported with File → Export → Export to PDF in Power BI Desktop after a Refresh on the clean
+build (2026-11-08), then rendered at 200 dpi: `docs/figures/dashboard.pdf` and
+`docs/figures/dashboard_1_sales.png` … `dashboard_5_data_quality.png`. Number formats follow
+the Windows locale of the machine (here Vietnamese: `13.181.027`, `99,73%`).
+
+Notes from the A3 check:
+
+- Table visuals have the total row turned off (`powerbi.py`); a total of review scores or
+  fail shares means nothing.
+- The first Refresh after the project files change on disk can fail with "kpis_clean: a cyclic
+  reference was encountered". This came from Power BI's cached model (`.pbi/cache.abf`); a second
+  Refresh, or "Apply external changes", fixed it. Not reproduced on a fresh clone.
