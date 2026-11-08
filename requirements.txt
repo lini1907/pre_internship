@@ -7,5 +7,7 @@ pydantic==2.11.9
 matplotlib==3.10.0
 scipy==1.16.2
 joblib==1.5.2
+statsmodels==0.14.6
+scikit-posthocs==0.17.1
 pytest==9.2.0
 ruff

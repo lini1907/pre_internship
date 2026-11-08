@@ -9,8 +9,9 @@ The .runs file is written last, so its presence marks a finished cell (--resume)
 
 from __future__ import annotations
 
+import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import duckdb
@@ -19,7 +20,7 @@ import pandas as pd
 from dqk import ROOT
 from dqk.config import KpiSpec, load_kpi_spec
 from dqk.dq import DqConfig, load_dq_config, run_dq_checks
-from dqk.experiment.grid import Cell
+from dqk.experiment.grid import BaselineOptions, Cell
 from dqk.experiment.measures import dq_measures, kpi_measures, run_summary
 from dqk.inject import inject_errors, unit_table
 from dqk.kpis import compute_kpis
@@ -37,6 +38,45 @@ class Baseline:
     dq: pd.DataFrame
     kpi_spec: KpiSpec
     dq_config: DqConfig
+    options: BaselineOptions | None = None
+
+    def compute_kpis(self, mart: Mart) -> pd.DataFrame:
+        return kpis_for(mart, self.kpi_spec, bool(self.options and self.options.use_alt_kpis))
+
+
+def kpis_for(mart: Mart, spec: KpiSpec, use_alt: bool = False) -> pd.DataFrame:
+    """compute_kpis; with use_alt each alternative definition is reported under the id of
+    the KPI it replaces, so the measures compare like with like."""
+    out = compute_kpis(mart, spec, use_alt=use_alt)
+    if use_alt:
+        multi = [k.id for k in spec.kpis if len(k.alt_definitions) > 1]
+        if multi:
+            raise ValueError(f"KPIs with several alt definitions: {multi}")
+        parent = {a.id: k.id for k in spec.kpis for a in k.alt_definitions}
+        out["kpi_id"] = out["kpi_id"].replace(parent)
+    return out
+
+
+def filter_mart(mart: Mart, opt: BaselineOptions | None) -> Mart:
+    """Apply the baseline filters of a robustness scenario to the clean mart.
+    Only the fact tables are filtered; dimensions stay complete."""
+    if opt is None:
+        return mart
+    o, i = mart.fact_orders, mart.fact_order_items
+    keep = pd.Series(True, index=o.index)
+    if opt.period is not None:
+        keep &= o["purchase_ts"].dt.year == opt.period
+    if opt.exclude_top_value_orders:
+        value = i.groupby("order_id")["price"].sum().astype(float)
+        value = o["order_id"].map(value).fillna(0.0)
+        k = round(opt.exclude_top_value_orders * len(o))
+        top = value.sort_values(ascending=False, kind="stable").index[:k]
+        keep &= ~o.index.isin(top)
+    if keep.all():
+        return mart
+    o = o[keep].reset_index(drop=True)
+    i = i[i["order_id"].isin(o["order_id"])].reset_index(drop=True)
+    return replace(mart, fact_orders=o, fact_order_items=i)
 
 
 def load_clean_mart(path: Path = WAREHOUSE) -> Mart:
@@ -46,15 +86,16 @@ def load_clean_mart(path: Path = WAREHOUSE) -> Mart:
     return mart
 
 
-def make_baseline(mart: Mart | None = None) -> Baseline:
-    mart = mart if mart is not None else load_clean_mart()
+def make_baseline(mart: Mart | None = None, options: BaselineOptions | None = None) -> Baseline:
+    mart = filter_mart(mart if mart is not None else load_clean_mart(), options)
     spec, cfg = load_kpi_spec(), load_dq_config()
     return Baseline(
         mart=mart,
-        kpis=compute_kpis(mart, spec),
+        kpis=kpis_for(mart, spec, bool(options and options.use_alt_kpis)),
         dq=run_dq_checks(mart.as_tables(), "mart", cfg),
         kpi_spec=spec,
         dq_config=cfg,
+        options=options,
     )
 
 
@@ -64,7 +105,7 @@ def run_once(
     t0 = time.perf_counter()
     corrupted, log = inject_errors(base.mart, cell.spec, seed, units)
     t1 = time.perf_counter()
-    kpis = compute_kpis(corrupted, base.kpi_spec)
+    kpis = base.compute_kpis(corrupted)
     dq = run_dq_checks(corrupted.as_tables(), "mart", base.dq_config)
     t2 = time.perf_counter()
     km = kpi_measures(base.kpis, kpis, base.kpi_spec)
@@ -111,15 +152,28 @@ def run_cell(base: Baseline, cell: Cell, seeds, out_dir: Path) -> pd.DataFrame:
     return runs_df
 
 
-_WORKER_BASE: Baseline | None = None
+_WORKER_MART: Mart | None = None
+_WORKER_BASES: dict[str, Baseline] = {}
 
 
-def _worker_cell(cell: Cell, seeds: list[int], out_dir: str) -> str:
-    """joblib entry point: each worker process builds the baseline once and reuses it."""
-    global _WORKER_BASE
-    if _WORKER_BASE is None:
-        _WORKER_BASE = make_baseline()
-    run_cell(_WORKER_BASE, cell, seeds, Path(out_dir))
+def _worker_cell(
+    cell: Cell,
+    seeds: list[int],
+    out_dir: str,
+    options: BaselineOptions | None = None,
+    duckdb_threads: int | None = None,
+) -> str:
+    """joblib entry point: each worker process loads the clean mart once, builds one
+    baseline per set of options and reuses them."""
+    global _WORKER_MART
+    if duckdb_threads:
+        os.environ["DQK_DUCKDB_THREADS"] = str(duckdb_threads)
+    key = options.key() if options else ""
+    if key not in _WORKER_BASES:
+        if _WORKER_MART is None:
+            _WORKER_MART = load_clean_mart()
+        _WORKER_BASES[key] = make_baseline(_WORKER_MART, options)
+    run_cell(_WORKER_BASES[key], cell, seeds, Path(out_dir))
     return cell.cell_id
 
 
@@ -130,6 +184,7 @@ def run_cells(
     workers: int = 1,
     resume: bool = False,
     progress=print,
+    options: BaselineOptions | None = None,
 ) -> list[str]:
     todo = [c for c in cells if not (resume and cell_paths(out_dir, c)["runs"].exists())]
     if len(todo) < len(cells):
@@ -138,11 +193,11 @@ def run_cells(
         done = []
         for n, c in enumerate(todo, 1):
             t = time.perf_counter()
-            done.append(_worker_cell(c, seeds, str(out_dir)))
+            done.append(_worker_cell(c, seeds, str(out_dir), options))
             progress(f"[{n}/{len(todo)}] {c.cell_id}  {time.perf_counter() - t:.1f}s")
         return done
     from joblib import Parallel, delayed
 
     return Parallel(n_jobs=workers, verbose=10)(
-        delayed(_worker_cell)(c, seeds, str(out_dir)) for c in todo
+        delayed(_worker_cell)(c, seeds, str(out_dir), options, duckdb_threads=1) for c in todo
     )

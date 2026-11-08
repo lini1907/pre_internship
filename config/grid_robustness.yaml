@@ -1,0 +1,115 @@
+# Robustness grids (proposal 6.5, code plan 4.6).
+# Each scenario is a grid of its own with its own clean baseline; results go to
+# results/runs/robustness/<scenario>/. Top-level rates / n_seeds are defaults that a
+# scenario may override. To save time: 100 seeds and rates 5 % and 10 % (code plan 4.6).
+#
+# Covered elsewhere, no run needed:
+#   MCAR / MAR / MNAR        -> main grid
+#   materiality threshold    -> material_0_005 / _0_01 / _0_05 are computed in every run
+#
+# baseline options (dqk.experiment.grid.BaselineOptions):
+#   use_alt_kpis: true               alt_definitions of kpi_spec.yaml (K5 -> K5_all_orders)
+#   exclude_top_value_orders: 0.01   drop the 1 % of orders with the highest item value
+#   period: 2017 | 2018              keep only orders purchased in that year
+
+name: robustness
+rates: [0.05, 0.10]
+n_seeds: 100
+
+# The 13 (error x mechanism) combinations of the main grid, reused by four scenarios.
+main_errors: &main_errors
+  - code: E1
+    variant: duplicate_order
+    mechanisms:
+      MCAR: {}
+      MAR: {by: seller_state, groups: [SP], weight: 5}
+  - code: E2
+    variant: orphan_product
+    mechanisms:
+      MCAR: {}
+      MAR: {by: category, groups: [health_beauty, watches_gifts], weight: 5}
+  - code: E3
+    variant: missing_delivery_date
+    mechanisms:
+      MCAR: {}
+      MAR: {by: customer_state, groups: [RJ, BA], weight: 5}
+      MNAR: {by_value: delivery_delay_days, strength: 1.0}
+  - code: E4
+    variant: tz_shift_3h
+    mechanisms:
+      MCAR: {}
+      MAR: {by: customer_state, groups: [RJ, MG], weight: 5}
+  - code: E5
+    variant: price_x100
+    mechanisms:
+      MCAR: {}
+      MNAR: {by_value: price, strength: 1.0, log: true}
+  - code: E6
+    variant: category_reassign
+    mechanisms:
+      MCAR: {}
+      MAR: {by: category, groups: [bed_bath_table, furniture_decor], weight: 5}
+
+scenarios:
+  - name: alt_kpi
+    baseline: {use_alt_kpis: true}
+    errors: *main_errors
+
+  - name: no_top1pct
+    baseline: {exclude_top_value_orders: 0.01}
+    errors: *main_errors
+
+  - name: period_2017
+    baseline: {period: 2017}
+    errors: *main_errors
+
+  - name: period_2018
+    baseline: {period: 2018}
+    errors: *main_errors
+
+  # Secondary variants of every error type on the full baseline.
+  - name: variants
+    errors:
+      - code: E2
+        variant: orphan_seller
+        mechanisms:
+          MCAR: {}
+          MAR: {by: category, groups: [health_beauty, watches_gifts], weight: 5}
+      - code: E3
+        variant: missing_review_score
+        mechanisms:
+          MCAR: {}
+          MAR: {by: customer_state, groups: [RJ, BA], weight: 5}
+          MNAR: {by_value: review_score, strength: -1.0}   # low scores go missing
+      - code: E3
+        variant: missing_category
+        mechanisms:
+          MCAR: {}
+          MAR: {by: category, groups: [bed_bath_table, furniture_decor], weight: 5}
+      - code: E4
+        variant: day_month_swap
+        mechanisms:
+          MCAR: {}
+          MAR: {by: customer_state, groups: [RJ, MG], weight: 5}
+      - code: E5
+        variant: price_div100
+        mechanisms:
+          MCAR: {}
+          MNAR: {by_value: price, strength: 1.0, log: true}
+      - code: E6
+        variant: category_spelling
+        mechanisms:
+          MCAR: {}
+          MAR: {by: category, groups: [bed_bath_table, furniture_decor], weight: 5}
+
+  # Decision D6: re-keyed duplicates pass the uniqueness check, the typical silent error
+  # for RQ3. Full rate range and seed count, so it can sit next to the main grid.
+  - name: rekeyed
+    rates: [0.01, 0.02, 0.05, 0.10, 0.20]
+    n_seeds: 200
+    errors:
+      - code: E1
+        variant: duplicate_order_rekeyed
+        mechanisms:
+          MCAR: {}
+          MAR: {by: seller_state, groups: [SP], weight: 5}

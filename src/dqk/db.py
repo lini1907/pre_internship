@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -15,8 +16,16 @@ _PARAM = re.compile(r"\$([A-Za-z_][A-Za-z0-9_]*)")
 
 
 def connect(tables: Tables | None = None, database: str = ":memory:") -> duckdb.DuckDBPyConnection:
-    """Open a connection and expose each DataFrame as a view with the same name."""
-    con = duckdb.connect(database)
+    """Open a connection and expose each DataFrame as a view with the same name.
+
+    DQK_DUCKDB_THREADS caps DuckDB's threads per connection. The parallel experiment runner
+    sets it to 1 in each worker so N workers do not start N x n_cores threads."""
+    config = {}
+    if os.environ.get("DQK_DUCKDB_THREADS"):
+        config = {"threads": int(os.environ["DQK_DUCKDB_THREADS"])}
+    con = duckdb.connect(database, config=config)
+    if config:
+        con.execute("SET enable_progress_bar = false")
     if tables is not None:
         for name, df in tables:
             con.register(name, df)
