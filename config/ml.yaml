@@ -1,0 +1,22 @@
+# ML settings (code plan v1.2). Written before any model was fitted; hyperparameters are
+# fixed library-default-like values, not tuned on the test folds or on the results.
+version: 1
+
+rq5:
+  tau: 0.01                   # materiality threshold, as in RQ3
+  seed: 20261119
+  # Natural load-to-load variation of the core checks, from clean data only
+  # (dqk.ml.noise). Trials 0..n_aug-1 are added to the injected runs, the remaining trials
+  # become clean runs (label 0), so no noise vector is used twice.
+  noise:
+    n_trials: 200
+    n_aug: 100
+    zero_dims: [volume]       # volume checks compare with a known reference count: no noise
+  # Operating point: alarm threshold = this quantile of the scores of non-material runs,
+  # taken from inner cross-validated predictions on the training folds only.
+  alarm_rate: 0.05
+  n_boot: 1000
+  models:
+    logreg: {C: 1.0, max_iter: 2000}
+    rf: {n_estimators: 500, min_samples_leaf: 5, n_jobs: -1}
+    gb: {max_iter: 300, learning_rate: 0.05, max_leaf_nodes: 15, min_samples_leaf: 20}
