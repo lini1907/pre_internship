@@ -7,12 +7,15 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from dqk import CONFIG_DIR, SQL_DIR
+from dqk import CONFIG_DIR, ROOT, SQL_DIR
 from dqk.db import connect, read_sql
 from dqk.io import OLIST_DIR, OLIST_FILES
 from dqk.tables import MART_SCHEMA, Mart, Tables
 
 TRANSLATION_EXTRA = CONFIG_DIR / "category_translation_extra.csv"
+# Snapshot of the last accepted mart, read by the reference-based checks C22-C24 (v1.1).
+REFERENCE_DIR = ROOT / "warehouse" / "reference"
+REFERENCE_TABLES = ("dim_product", "fact_order_items")
 
 # Build order matters: dim_customer and dim_date read stg_orders, facts read several.
 STAGING_TABLES = [
@@ -85,3 +88,22 @@ def write_schema(tables: Tables, schema: str, con: duckdb.DuckDBPyConnection) ->
 
 def write_raw(raw: Tables, con: duckdb.DuckDBPyConnection) -> None:
     write_schema(raw, "raw", con)
+
+
+def save_reference(mart: Mart, folder: Path = REFERENCE_DIR) -> list[Path]:
+    """Store the tables C22-C24 compare with, after a load that was accepted."""
+    folder.mkdir(parents=True, exist_ok=True)
+    out = []
+    for name in REFERENCE_TABLES:
+        path = folder / f"{name}.parquet"
+        getattr(mart, name).to_parquet(path, index=False)
+        out.append(path)
+    return out
+
+
+def load_reference(folder: Path = REFERENCE_DIR) -> Tables | None:
+    """The last accepted snapshot, or None if no load was accepted yet."""
+    paths = {n: folder / f"{n}.parquet" for n in REFERENCE_TABLES}
+    if not all(p.exists() for p in paths.values()):
+        return None
+    return Tables({n: pd.read_parquet(p) for n, p in paths.items()})

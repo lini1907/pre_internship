@@ -67,6 +67,19 @@ dq:
     C15: no approval timestamps
     C16: no delivery dates
     C18: no independent payment record to reconcile against
+  # Extended suite (v1.1, config/dq_checks_extended.yaml).
+  checks_extended: [C21, C24]
+  # C24 thresholds calibrated on clean Online Retail II (split-half p99 = 0.0268, 200 seeds,
+  # python -m dqk.analysis.false_alarms --calibrate --dataset retail, 2026-11-17), before
+  # any injection run. The Olist values (0.0192 / 0.0383) sit below the clean retail level
+  # (line revenue = Quantity x Price is wider than a unit price), so C24 would warn on
+  # clean data and could hardly worsen.
+  thresholds_extended:
+    C24: {warn_share: 0.0268, fail_share: 0.0535}
+  not_applicable_extended:
+    C22: category_en is the StockCode itself (no categories), so a category change is a
+      product change
+    C23: same reason; the "category mix" would be the product mix
 
 # Error types: E1-E5 apply; E6 does not (no categories). E3 uses missing_customer_id,
 # since the main variant (missing_delivery_date) has no target column here.

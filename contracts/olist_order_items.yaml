@@ -1,0 +1,34 @@
+# Data contract for the raw order items file (code plan v1.1, M3). See olist_orders.yaml.
+apiVersion: v3.0.0
+kind: DataContract
+id: olist-order-items
+name: Olist order items (raw)
+version: 1.0.0
+status: active
+owner: Olist order management (source system)
+consumer: analytics team (KPI dashboard)
+description: One row per item of an order. price and freight_value are in BRL (reais),
+  with a dot as decimal separator.
+source_file: olist_order_items_dataset.csv
+schema:
+  - name: order_items
+    physicalName: raw.order_items
+    properties:
+      - {name: order_id, logicalType: string, required: true, primaryKey: true}
+      - {name: order_item_id, logicalType: integer, required: true, primaryKey: true}
+      - {name: product_id, logicalType: string, required: true}
+      - {name: seller_id, logicalType: string, required: true}
+      - {name: shipping_limit_date, logicalType: timestamp, required: true}
+      - {name: price, logicalType: number, required: true, unit: BRL}
+      - {name: freight_value, logicalType: number, required: true, unit: BRL}
+quality:
+  - {check: C01, description: key columns not null}
+  - {check: C06, description: (order_id, order_item_id) unique}
+  - {check: C08, description: product exists}
+  - {check: C09, description: seller exists}
+  - {check: C11, description: price > 0}
+  - {check: C12, description: freight_value >= 0}
+  - {check: C24, description: price plausible within its category (v1.1)}
+slaProperties:
+  - {property: frequency, value: daily}
+  - {property: max_unparseable_share, value: 0.001}

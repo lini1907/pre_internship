@@ -1,0 +1,63 @@
+# Extended data quality checks C21-C24 (v1.1, code plan v1.1 section 2).
+#
+# Loaded on top of config/dq_checks.yaml by load_dq_config(suite="extended"); the core
+# suite (suite="core", the default) is unchanged. None of these checks is in the DQ score.
+#
+# C21 is derived from the KPI-check traceability matrix: K9 and K10 depend on the
+# customer key, which no core check protects. C22-C24 compare the current load with a
+# *reference* (the last accepted load). Reference tables are registered with the prefix
+# ref_ (ref_dim_product, ref_fact_order_items); a check that needs a reference is skipped,
+# with status "skipped", when none is given.
+#
+# Thresholds of C23 and C24 were calibrated on clean data only (split-half, 200 seeds;
+# src/dqk/analysis/false_alarms.py, results/tables/f1_false_alarms.csv) BEFORE any
+# error-injection run with this suite: warn just above the 99th percentile of fail_share,
+# fail at twice that. They were not changed after looking at injection results.
+
+version: 1
+
+params:
+  drift_z: 4.0            # C23: a category drifts when |n_cur - n_exp| > z*sqrt(n_exp) + min_abs
+  drift_min_abs: 10       # C23: absolute slack in line counts
+  price_k: 5.0            # C24: |log(price) - median| > k * MAD of the reference category
+  price_min_items: 30     # C24: categories with fewer reference lines use global stats
+
+# Logical reference table -> registered table name (mart layer).
+reference:
+  ref_products: ref_dim_product
+  ref_items: ref_fact_order_items
+
+checks:
+  - id: C21
+    name: order has a customer key
+    dimension: completeness
+    layers: [mart]
+    sql: dq/c21_customer_key_not_null.sql
+    in_dq_score: false
+
+  - id: C22
+    name: product category unchanged vs the reference snapshot
+    dimension: semantic
+    layers: [mart]
+    sql: dq/c22_category_vs_snapshot.sql
+    warn_share: 0.001
+    fail_share: 0.01
+    in_dq_score: false
+
+  - id: C23
+    name: category mix of order lines within tolerance of the reference
+    dimension: semantic
+    layers: [mart]
+    sql: dq/c23_category_mix_drift.sql
+    warn_share: 0.0271      # split-half p99 = 2/74 categories (calibrated 2026-11-17)
+    fail_share: 0.0541
+    in_dq_score: false
+
+  - id: C24
+    name: price plausible within its category (log price within median +- k MAD)
+    dimension: semantic
+    layers: [mart]
+    sql: dq/c24_price_plausible.sql
+    warn_share: 0.0192      # split-half p99 = 0.0191 (calibrated 2026-11-17)
+    fail_share: 0.0383
+    in_dq_score: false

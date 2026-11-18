@@ -1,0 +1,5 @@
+scenario,n_tests,n_pass,n_warn,n_fail,changed_vs_clean
+clean,31,30,1,0,none
+double_load,31,26,2,3,"c06_order_item_unique fail, c18_payment_reconciles fail, unique_fact_orders_order_id fail, unique_fact_orders_review_id warn"
+price_in_cents,31,29,1,1,c18_payment_reconciles fail
+category_migration,31,30,1,0,none

@@ -18,9 +18,12 @@ from dqk.inject.spec import ErrorSpec
 
 
 class ErrorEntry(BaseModel):
+    """rates: optional per-error override of the grid's rates (v1.1)."""
+
     code: str
     variant: str
     mechanisms: dict[str, dict]
+    rates: list[float] | None = None
 
 
 class BaselineOptions(BaseModel):
@@ -41,10 +44,13 @@ class BaselineOptions(BaseModel):
 
 class GridConfig(BaseModel):
     """dataset: 'olist' (warehouse/olist.duckdb) or 'retail' (Online Retail II,
-    warehouse/retail.duckdb, KPI and DQ subsets of src/dqk/retail/kpi_map.yaml)."""
+    warehouse/retail.duckdb, KPI and DQ subsets of src/dqk/retail/kpi_map.yaml).
+    dq_suite: 'core' (C01-C20) or 'extended' (also C21-C24, with the clean mart as the
+    reference of C22-C24; config/dq_checks_extended.yaml)."""
 
     name: str
     dataset: Literal["olist", "retail"] = "olist"
+    dq_suite: Literal["core", "extended"] = "core"
     rates: list[float]
     n_seeds: int
     errors: list[ErrorEntry]
@@ -88,7 +94,7 @@ def expand(grid: GridConfig) -> list[Cell]:
         Cell(ErrorSpec(e.code, e.variant, mech, rate, params or {}))
         for e in grid.errors
         for mech, params in e.mechanisms.items()
-        for rate in grid.rates
+        for rate in (e.rates if e.rates is not None else grid.rates)
     ]
     ids = [c.cell_id for c in cells]
     if len(ids) != len(set(ids)):

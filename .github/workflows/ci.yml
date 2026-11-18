@@ -1,0 +1,30 @@
+# Continuous integration (code plan v1.1, M2): lint, KPI spec lock, fast tests.
+# Tests marked slow need the real Olist data (data/, warehouse/) and do not run here.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+      - name: Lint
+        run: ruff check src tests dbt run_pipeline.py run_experiment.py
+      - name: KPI spec lock
+        run: python -m dqk.config check
+      - name: dbt models in sync with sql/
+        run: python dbt/sync_models.py --check
+      - name: Tests (fast)
+        run: pytest -m "not slow" -q

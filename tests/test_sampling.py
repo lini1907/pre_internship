@@ -101,3 +101,18 @@ def test_mnar_prefers_large_values():
 def test_mnar_weights_handle_missing_and_log():
     w = mnar_weights(pd.Series([1.0, None, 100.0]), strength=1.0, log=True)
     assert w[1] == 1.0 and w[2] > w[0]
+
+
+LOW_RATES = [0.001, 0.0025, 0.005, 0.01, 0.02]
+
+
+@pytest.mark.parametrize("mech,params", [("MCAR", {}), ("MAR", MAR), ("MNAR", MNAR)])
+def test_low_rates_select_units_and_stay_nested(mech, params):
+    """v1.1 N3: at 0.1 % of the Olist unit counts (products 32,341, items 112,650) at
+    least one unit is chosen, and the sets stay nested up to the main-grid rates."""
+    for n in (32341, 112650):
+        u = _units(n)
+        sets = [_select(u, r, seed=3, mech=mech, params=params) for r in LOW_RATES]
+        assert len(sets[0]) == n_to_select(0.001, n) > 0
+        for small, big in zip(sets, sets[1:], strict=False):
+            assert small <= big

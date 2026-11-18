@@ -21,8 +21,10 @@ from dqk.db import connect, read_sql, run_sql
 from dqk.tables import Tables
 
 DQ_CHECKS = CONFIG_DIR / "dq_checks.yaml"
+DQ_CHECKS_EXTENDED = CONFIG_DIR / "dq_checks_extended.yaml"
 
 Layer = Literal["raw", "staging", "mart"]
+Suite = Literal["core", "extended"]
 Dimension = Literal[
     "completeness",
     "uniqueness",
@@ -31,7 +33,9 @@ Dimension = Literal[
     "temporal",
     "reconciliation",
     "volume",
+    "semantic",
 ]
+REF_PREFIX = "ref_"
 STATUS_ORDER = {"pass": 0, "warn": 1, "fail": 2}
 _PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
 
@@ -41,6 +45,11 @@ class DqParams(BaseModel):
     data_end: date
     payment_tolerance: float
     valid_states: list[str]
+    # Extended suite (config/dq_checks_extended.yaml); None in the core suite.
+    drift_z: float | None = None
+    drift_min_abs: float | None = None
+    price_k: float | None = None
+    price_min_items: int | None = None
 
 
 class Check(BaseModel):
@@ -52,6 +61,11 @@ class Check(BaseModel):
     warn_share: float | None = None
     fail_share: float | None = None
     in_dq_score: bool
+
+    def reference_tables(self) -> list[str]:
+        """Logical tables of a reference (prefix ref_) that this check reads."""
+        names = _PLACEHOLDER.findall(read_sql(self.sql))
+        return sorted(t for t in names if t.startswith(REF_PREFIX))
 
 
 class DqConfig(BaseModel):
@@ -85,8 +99,20 @@ class DqConfig(BaseModel):
         return self.params.model_dump() | {f"ref_{k}": v for k, v in ref.items()}
 
 
-def load_dq_config(path: Path = DQ_CHECKS) -> DqConfig:
-    return DqConfig.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+def load_dq_config(
+    path: Path = DQ_CHECKS, suite: Suite = "core", extended_path: Path = DQ_CHECKS_EXTENDED
+) -> DqConfig:
+    """The core catalogue (C01-C20); with suite="extended" also C21-C24, their params and
+    the reference table names (mart layer) of config/dq_checks_extended.yaml."""
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if suite == "extended":
+        ext = yaml.safe_load(extended_path.read_text(encoding="utf-8"))
+        raw["params"] = {**raw["params"], **ext["params"]}
+        raw["layers"]["mart"] = {**raw["layers"]["mart"], **ext["reference"]}
+        raw["checks"] = raw["checks"] + ext["checks"]
+    elif suite != "core":
+        raise ValueError(f"unknown suite {suite}")
+    return DqConfig.model_validate(raw)
 
 
 def render_sql(sql: str, table_map: dict[str, str]) -> str:
@@ -101,16 +127,42 @@ def status_of(share: float, warn_share: float, fail_share: float) -> str:
     return "pass"
 
 
-def run_dq_checks(tables: Tables, layer: Layer, config: DqConfig | None = None) -> pd.DataFrame:
+def run_dq_checks(
+    tables: Tables,
+    layer: Layer,
+    config: DqConfig | None = None,
+    reference: Tables | None = None,
+) -> pd.DataFrame:
     """One row per check that applies to ``layer``:
-    check_id, layer, dimension, n_failed, n_total, fail_share, status, in_dq_score."""
+    check_id, layer, dimension, n_failed, n_total, fail_share, status, in_dq_score.
+
+    ``reference`` (e.g. the last accepted mart) is registered next to ``tables`` with the
+    prefix ref_. A check that reads a reference table gets status "skipped" (n_failed and
+    n_total 0, fail_share NaN) when no reference is given."""
     config = config or load_dq_config()
     table_map = config.layers[layer]
     params = config.layer_params(layer)
-    con = connect(tables)
+    frames = dict(tables.frames)
+    if reference is not None:
+        frames |= {f"{REF_PREFIX}{n}": df for n, df in reference}
+    con = connect(Tables(frames))
     rows = []
     for c in config.checks:
         if layer not in c.layers:
+            continue
+        if reference is None and c.reference_tables():
+            rows.append(
+                {
+                    "check_id": c.id,
+                    "layer": layer,
+                    "dimension": c.dimension,
+                    "n_failed": 0,
+                    "n_total": 0,
+                    "fail_share": float("nan"),
+                    "status": "skipped",
+                    "in_dq_score": c.in_dq_score,
+                }
+            )
             continue
         sql = render_sql(read_sql(c.sql), table_map)
         n_failed, n_total = run_sql(con, sql, params).iloc[0][["n_failed", "n_total"]]
@@ -198,10 +250,61 @@ def render_catalogue(config: DqConfig, baseline: pd.DataFrame | None = None) -> 
     return "\n".join(out)
 
 
+def render_extended(config: DqConfig, false_alarms: pd.DataFrame | None = None) -> str:
+    """The "Extended suite (v1.1)" section: C21-C24, their parameters and false alarms."""
+    p = config.params
+    out = [
+        "## Extended suite (v1.1)",
+        "",
+        "Generated from `config/dq_checks_extended.yaml` (`load_dq_config(suite=\"extended\")`). "
+        "Not in the DQ score. C22-C24 compare the load with a reference (the last accepted "
+        "load, tables `ref_dim_product`, `ref_fact_order_items`) and are `skipped` without one.",
+        "",
+        f"Parameters: C23 drift when |n_cur - n_exp| > {p.drift_z:g} * sqrt(n_exp) + "
+        f"{p.drift_min_abs:g}; C24 band median +- {p.price_k:g} * MAD of log(price); "
+        f"categories with fewer than {p.price_min_items} reference lines use global statistics.",
+        "",
+        "| ID | Dimension | Check | warn | fail | SQL |",
+        "|---|---|---|---|---|---|",
+    ]
+    for c in config.checks[20:]:
+        out.append(
+            f"| {c.id} | {c.dimension} | {c.name} | {c.warn_share:g} | {c.fail_share:g} | "
+            f"`sql/{c.sql}` |"
+        )
+    out += [
+        "",
+        "C23 and C24 thresholds: warn = 99th percentile of fail_share over 200 random "
+        "split-half pairs of the clean mart, fail = 2 x warn, set before any injection run "
+        "(`python -m dqk.analysis.false_alarms --calibrate`). Online Retail II uses its own "
+        "C24 thresholds (`src/dqk/retail/kpi_map.yaml`).",
+    ]
+    if false_alarms is not None:
+        out += [
+            "",
+            "False alarms on clean data (`results/tables/f1_false_alarms.csv`):",
+            "",
+            "| Dataset | Check | Method | Trials | Alarms | Rate | 95 % CI |",
+            "|---|---|---|---|---|---|---|",
+        ]
+        for r in false_alarms.itertuples():
+            out.append(
+                f"| {r.dataset} | {r.check_id} | {r.method} | {r.n_trials} | {r.n_alarms} | "
+                f"{r.alarm_rate:.1%} | {r.ci_low:.1%}-{r.ci_high:.1%} |"
+            )
+    out.append("")
+    return "\n".join(out)
+
+
 def write_catalogue(results_csv: Path = RESULTS_DIR / "stage_a" / "dq_results.csv") -> Path:
     baseline = pd.read_csv(results_csv) if results_csv.exists() else None
+    fa_csv = RESULTS_DIR / "tables" / "f1_false_alarms.csv"
+    false_alarms = pd.read_csv(fa_csv) if fa_csv.exists() else None
+    text = render_catalogue(load_dq_config(), baseline) + "\n" + render_extended(
+        load_dq_config(suite="extended"), false_alarms
+    )
     path = DOCS_DIR / "dq_catalogue.md"
-    path.write_text(render_catalogue(load_dq_config(), baseline), encoding="utf-8", newline="\n")
+    path.write_text(text, encoding="utf-8", newline="\n")
     return path
 
 

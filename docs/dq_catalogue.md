@@ -30,3 +30,35 @@ Parameters: data period [2016-09-01, 2018-11-01), payment tolerance 1 BRL, 27 va
 | C20 | volume | order item row count within tolerance of the reference load | raw, staging, mart | 0.01 | 0.05 |  | `sql/dq/c20_items_volume.sql` | 0 / 112,650 | 0.000% | pass |
 
 Clean baseline by layer — raw: pass 2, staging: pass 18, warn 1, mart: pass 19, warn 1.
+
+## Extended suite (v1.1)
+
+Generated from `config/dq_checks_extended.yaml` (`load_dq_config(suite="extended")`). Not in the DQ score. C22-C24 compare the load with a reference (the last accepted load, tables `ref_dim_product`, `ref_fact_order_items`) and are `skipped` without one.
+
+Parameters: C23 drift when |n_cur - n_exp| > 4 * sqrt(n_exp) + 10; C24 band median +- 5 * MAD of log(price); categories with fewer than 30 reference lines use global statistics.
+
+| ID | Dimension | Check | warn | fail | SQL |
+|---|---|---|---|---|---|
+| C21 | completeness | order has a customer key | 0 | 0.001 | `sql/dq/c21_customer_key_not_null.sql` |
+| C22 | semantic | product category unchanged vs the reference snapshot | 0.001 | 0.01 | `sql/dq/c22_category_vs_snapshot.sql` |
+| C23 | semantic | category mix of order lines within tolerance of the reference | 0.0271 | 0.0541 | `sql/dq/c23_category_mix_drift.sql` |
+| C24 | semantic | price plausible within its category (log price within median +- k MAD) | 0.0192 | 0.0383 | `sql/dq/c24_price_plausible.sql` |
+
+C23 and C24 thresholds: warn = 99th percentile of fail_share over 200 random split-half pairs of the clean mart, fail = 2 x warn, set before any injection run (`python -m dqk.analysis.false_alarms --calibrate`). Online Retail II uses its own C24 thresholds (`src/dqk/retail/kpi_map.yaml`).
+
+False alarms on clean data (`results/tables/f1_false_alarms.csv`):
+
+| Dataset | Check | Method | Trials | Alarms | Rate | 95 % CI |
+|---|---|---|---|---|---|---|
+| olist | C21 | month_vs_past | 20 | 0 | 0.0% | 0.0%-16.1% |
+| olist | C21 | split_half | 200 | 0 | 0.0% | 0.0%-1.9% |
+| olist | C22 | month_vs_past | 20 | 0 | 0.0% | 0.0%-16.1% |
+| olist | C22 | split_half | 200 | 0 | 0.0% | 0.0%-1.9% |
+| olist | C23 | month_vs_past | 20 | 19 | 95.0% | 76.4%-99.1% |
+| olist | C23 | split_half | 200 | 0 | 0.0% | 0.0%-1.9% |
+| olist | C24 | month_vs_past | 20 | 7 | 35.0% | 18.1%-56.7% |
+| olist | C24 | split_half | 200 | 1 | 0.5% | 0.1%-2.8% |
+| retail | C21 | month_vs_past | 24 | 0 | 0.0% | 0.0%-13.8% |
+| retail | C21 | split_half | 200 | 0 | 0.0% | 0.0%-1.9% |
+| retail | C24 | month_vs_past | 24 | 5 | 20.8% | 9.2%-40.5% |
+| retail | C24 | split_half | 200 | 0 | 0.0% | 0.0%-1.9% |

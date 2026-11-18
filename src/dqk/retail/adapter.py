@@ -68,12 +68,18 @@ def retail_kpi_spec(spec: KpiSpec | None = None, kmap: dict | None = None) -> Kp
     )
 
 
-def retail_dq_config(cfg: DqConfig | None = None, kmap: dict | None = None) -> DqConfig:
+def retail_dq_config(
+    cfg: DqConfig | None = None, kmap: dict | None = None, suite: str = "core"
+) -> DqConfig:
     """dq_checks.yaml restricted to the checks that apply, with retail params and the
-    retail reference row counts. Thresholds stay those of the Olist catalogue."""
-    cfg = cfg or load_dq_config()
+    retail reference row counts. Thresholds stay those of the Olist catalogue.
+    suite="extended" adds dq.checks_extended of kpi_map.yaml (C21, C24), with the C24
+    thresholds of dq.thresholds_extended (calibrated on clean Online Retail II)."""
+    cfg = cfg or load_dq_config(suite=suite)
     dq = (kmap or load_kpi_map())["dq"]
-    unknown = set(dq["checks"]) - {c.id for c in cfg.checks}
+    keep = list(dq["checks"]) + (list(dq.get("checks_extended", [])) if suite == "extended" else [])
+    over = dq.get("thresholds_extended", {}) if suite == "extended" else {}
+    unknown = set(keep) - {c.id for c in cfg.checks}
     if unknown:
         raise ValueError(f"kpi_map lists unknown checks: {sorted(unknown)}")
     params = cfg.params.model_copy(
@@ -86,7 +92,9 @@ def retail_dq_config(cfg: DqConfig | None = None, kmap: dict | None = None) -> D
         update={
             "params": params,
             "reference_rows": dq["reference_rows"],
-            "checks": [c for c in cfg.checks if c.id in dq["checks"]],
+            "checks": [
+                c.model_copy(update=over.get(c.id, {})) for c in cfg.checks if c.id in keep
+            ],
         }
     )
 

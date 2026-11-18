@@ -9,6 +9,12 @@ dashboard (Stage A); error injection E1–E6, main and robustness grids, Online 
 RQ1–RQ3 statistics, tables and figures (Stage B). Every table and figure of the paper is rebuilt by
 `python -m dqk.analysis.make_all`.
 
+**v1.1 (branch `upgrade-v1.1`)** adds, without changing any v1.0 number: KPI-aware checks
+C21–C24 with thresholds calibrated on clean data, an extended experiment grid (RQ4, low error
+rates), KPI-weighted DQ score variants, an incident drill, raw data contracts, a dbt project for
+staging and mart, business analyses (cohorts, segments, Pareto, late-delivery what-if) and CI.
+See [v1.1](#v11-extended-checks-drill-dbt-ci).
+
 ![Dashboard, page 5: data quality](docs/figures/dashboard_5_data_quality.png)
 
 ## Setup
@@ -74,6 +80,45 @@ state), so the frozen KPI queries, DQ checks and injectors run unchanged. Which 
 and why the others do not: `src/dqk/retail/kpi_map.yaml`; cleaning rules with row counts:
 `docs/retail_adapter.md`.
 
+## v1.1: extended checks, drill, dbt, CI
+
+```bash
+python -m dqk.analysis.false_alarms --calibrate      # C23/C24 thresholds from clean split-halves
+python run_pipeline.py --suite extended --accept     # core + C21-C24; store the reference snapshot
+python run_experiment.py --grid config/grid_extended.yaml --only olist_ext --only olist_lowrate --workers 6 --resume
+python run_experiment.py --grid config/grid_extended.yaml --only retail_ext --workers 3 --resume
+python -m dqk.analysis.v11                           # t3c, t6*, t7, fig8-fig10, summary_v11.md
+python -m dqk.drill                                  # results/drill/, docs/figures/drill_status.png
+python -m dqk.insights                               # results/insights/, docs/figures/insight_*.png
+python -m dqk.contracts                              # validate data/olist against contracts/*.yaml
+```
+
+**Extended checks (C21–C24, `config/dq_checks_extended.yaml`).** C21 customer key present (the
+gap K9/K10 had in the traceability matrix); C22 product category unchanged vs the last accepted
+snapshot; C23 category mix of order lines vs the reference (aggregates only); C24 log price within
+median ± 5 MAD of its category. None is in the DQ score; the core suite (`--suite core`, default)
+gives exactly the v1.0 results. Thresholds of C23/C24 were set from 200 clean split-half pairs
+(warn = 99th percentile, fail = 2×) before any injection run; false alarms are in
+`results/tables/f1_false_alarms.csv`. On clean month-vs-past comparisons C23 alarms in 19 of 20
+months (real drift in the category mix), C24 in 7 of 20: aggregate drift checks are not usable
+without a stable reference.
+
+**Incident drill (`python -m dqk.drill`).** Four deterministic incidents: a week loaded twice
+(C05, C06, C07, C18 fail), one seller's prices in centavos (C18 fail, C24 warn; GMV +99 %), 3 % of
+one category re-mapped (only C22 reacts), and a renamed source column (stopped by the data contract
+before staging).
+
+**Data contracts (`contracts/*.yaml`, `src/dqk/contracts.py`).** Required columns, declared types
+and the share of values that do not cast; `run_pipeline.py` stops on a violation. The YAML follows
+the spirit of the Open Data Contract Standard but is not validated against it.
+
+**dbt (`dbt/`, `docs/dbt.md`).** Staging and mart as dbt-duckdb models generated from `sql/`;
+generic and singular dbt tests mirror C01–C18. Optional, in its own venv
+(`requirements-dbt.txt`). The dbt mart equals the pipeline mart row for row
+(`tests/test_dbt_parity.py`); lineage in `docs/figures/dbt_lineage.png`.
+
+**CI (`.github/workflows/ci.yml`).** ruff, KPI spec lock, dbt models in sync, `pytest -m "not slow"`.
+
 ## Check that your build matches
 
 A clean clone, set up as above, was tested on 2026-11-08: `python run_pipeline.py` exits 0,
@@ -104,6 +149,12 @@ Screenshots of the five pages are in `docs/figures/dashboard_*.png` (PDF: `docs/
 | `python -m dqk.diagrams` | `docs/star_schema.png` |
 | `python -m dqk.retail.adapter` | `warehouse/retail.duckdb`, `docs/retail_adapter.md` (downloads the UCI file on first run) |
 | `python -m dqk.analysis.make_all` | `results/tables/*`, `results/figures/*` |
+| `python -m dqk.analysis.false_alarms` | `results/tables/f1_false_alarms.csv` (v1.1) |
+| `python -m dqk.analysis.v11` | v1.1 tables t3c, t6, t6b, t6c, t7 and figures 8-10 |
+| `python -m dqk.drill` | `results/drill/`, `docs/figures/drill_status.png` (v1.1) |
+| `python -m dqk.insights` | `results/insights/`, `docs/figures/insight_*.png` (v1.1) |
+| `python -m dqk.contracts` | validates the raw files against `contracts/*.yaml` (v1.1) |
+| `python dbt/sync_models.py` | regenerate `dbt/models/` from `sql/staging`, `sql/mart` (v1.1) |
 | `pytest` | all tests; `pytest -m "not slow"` skips the reconciliation on real data |
 
 ## Layout
@@ -115,6 +166,11 @@ config/grid_*.yaml      main grid, robustness scenarios, Online Retail II grid
 config/kpi_spec.yaml    15 KPIs, parameters and the 5 decisions fixed before Stage B
 config/kpi_spec.lock    SHA-256 of the spec and every sql/kpi file
 config/dq_checks.yaml   20 checks: dimension, layers, warn/fail thresholds, reference row counts
+config/dq_checks_extended.yaml   C21-C24 (v1.1), parameters, calibrated thresholds
+config/traceability.yaml         KPI -> guarding checks (Part 2, Table 3.7), for N2
+contracts/              raw data contracts (v1.1)
+dbt/                    dbt-duckdb project for staging and mart (v1.1, optional)
+sql/analysis/           business analyses a01-a05 (v1.1)
 config/category_translation_extra.csv   two category translations missing from the source
 sql/staging/            one query per source table (casts, renames, one row per key)
 sql/mart/               star schema: fact_orders, fact_order_items, dim_*

@@ -29,21 +29,27 @@ from dqk.tables import MART_SCHEMA, Mart
 WAREHOUSE = ROOT / "warehouse" / "olist.duckdb"
 
 
-def dataset_setup(dataset: str = "olist") -> tuple[Path, KpiSpec, DqConfig]:
+def dataset_setup(
+    dataset: str = "olist", suite: str = "core"
+) -> tuple[Path, KpiSpec, DqConfig]:
     """(warehouse file, KPI spec, DQ config) of a dataset. Online Retail II uses the
-    subsets of src/dqk/retail/kpi_map.yaml on the same KPI and DQ SQL files."""
+    subsets of src/dqk/retail/kpi_map.yaml on the same KPI and DQ SQL files.
+    suite="extended" adds C21-C24 (v1.1)."""
     if dataset == "olist":
-        return WAREHOUSE, load_kpi_spec(), load_dq_config()
+        return WAREHOUSE, load_kpi_spec(), load_dq_config(suite=suite)
     if dataset == "retail":
         from dqk.retail.adapter import RETAIL_WAREHOUSE, retail_dq_config, retail_kpi_spec
 
-        return RETAIL_WAREHOUSE, retail_kpi_spec(), retail_dq_config()
+        return RETAIL_WAREHOUSE, retail_kpi_spec(), retail_dq_config(suite=suite)
     raise ValueError(f"unknown dataset {dataset}")
 
 
 @dataclass
 class Baseline:
-    """The clean mart and everything measured on it, computed once per worker."""
+    """The clean mart and everything measured on it, computed once per worker.
+
+    reference: the mart that reference-based checks (C22-C24) compare with; the clean
+    mart itself in the extended suite, None in the core suite."""
 
     mart: Mart
     kpis: pd.DataFrame
@@ -51,6 +57,10 @@ class Baseline:
     kpi_spec: KpiSpec
     dq_config: DqConfig
     options: BaselineOptions | None = None
+    reference: Mart | None = None
+
+    def ref_tables(self):
+        return self.reference.as_tables() if self.reference is not None else None
 
     def compute_kpis(self, mart: Mart) -> pd.DataFrame:
         return kpis_for(mart, self.kpi_spec, bool(self.options and self.options.use_alt_kpis))
@@ -99,18 +109,24 @@ def load_clean_mart(path: Path = WAREHOUSE) -> Mart:
 
 
 def make_baseline(
-    mart: Mart | None = None, options: BaselineOptions | None = None, dataset: str = "olist"
+    mart: Mart | None = None,
+    options: BaselineOptions | None = None,
+    dataset: str = "olist",
+    suite: str = "core",
 ) -> Baseline:
-    path, spec, cfg = dataset_setup(dataset)
+    path, spec, cfg = dataset_setup(dataset, suite)
     mart = filter_mart(mart if mart is not None else load_clean_mart(path), options)
-    return Baseline(
+    base = Baseline(
         mart=mart,
         kpis=kpis_for(mart, spec, bool(options and options.use_alt_kpis)),
-        dq=run_dq_checks(mart.as_tables(), "mart", cfg),
+        dq=pd.DataFrame(),
         kpi_spec=spec,
         dq_config=cfg,
         options=options,
+        reference=mart if suite == "extended" else None,
     )
+    base.dq = run_dq_checks(mart.as_tables(), "mart", cfg, reference=base.ref_tables())
+    return base
 
 
 def run_once(
@@ -120,7 +136,9 @@ def run_once(
     corrupted, log = inject_errors(base.mart, cell.spec, seed, units)
     t1 = time.perf_counter()
     kpis = base.compute_kpis(corrupted)
-    dq = run_dq_checks(corrupted.as_tables(), "mart", base.dq_config)
+    dq = run_dq_checks(
+        corrupted.as_tables(), "mart", base.dq_config, reference=base.ref_tables()
+    )
     t2 = time.perf_counter()
     km = kpi_measures(base.kpis, kpis, base.kpi_spec)
     dm = dq_measures(base.dq, dq)
@@ -167,7 +185,7 @@ def run_cell(base: Baseline, cell: Cell, seeds, out_dir: Path) -> pd.DataFrame:
 
 
 _WORKER_MARTS: dict[str, Mart] = {}
-_WORKER_BASES: dict[tuple[str, str], Baseline] = {}
+_WORKER_BASES: dict[tuple[str, str, str], Baseline] = {}
 
 
 def _worker_cell(
@@ -177,16 +195,17 @@ def _worker_cell(
     options: BaselineOptions | None = None,
     duckdb_threads: int | None = None,
     dataset: str = "olist",
+    suite: str = "core",
 ) -> str:
     """joblib entry point: each worker process loads each clean mart once, builds one
     baseline per (dataset, options) and reuses them."""
     if duckdb_threads:
         os.environ["DQK_DUCKDB_THREADS"] = str(duckdb_threads)
-    key = (dataset, options.key() if options else "")
+    key = (dataset, options.key() if options else "", suite)
     if key not in _WORKER_BASES:
         if dataset not in _WORKER_MARTS:
             _WORKER_MARTS[dataset] = load_clean_mart(dataset_setup(dataset)[0])
-        _WORKER_BASES[key] = make_baseline(_WORKER_MARTS[dataset], options, dataset)
+        _WORKER_BASES[key] = make_baseline(_WORKER_MARTS[dataset], options, dataset, suite)
     run_cell(_WORKER_BASES[key], cell, seeds, Path(out_dir))
     return cell.cell_id
 
@@ -200,6 +219,7 @@ def run_cells(
     progress=print,
     options: BaselineOptions | None = None,
     dataset: str = "olist",
+    suite: str = "core",
 ) -> list[str]:
     todo = [c for c in cells if not (resume and cell_paths(out_dir, c)["runs"].exists())]
     if len(todo) < len(cells):
@@ -208,11 +228,14 @@ def run_cells(
         done = []
         for n, c in enumerate(todo, 1):
             t = time.perf_counter()
-            done.append(_worker_cell(c, seeds, str(out_dir), options, dataset=dataset))
+            done.append(
+                _worker_cell(c, seeds, str(out_dir), options, dataset=dataset, suite=suite)
+            )
             progress(f"[{n}/{len(todo)}] {c.cell_id}  {time.perf_counter() - t:.1f}s")
         return done
     from joblib import Parallel, delayed
 
     return Parallel(n_jobs=workers, verbose=10)(
-        delayed(_worker_cell)(c, seeds, str(out_dir), options, 1, dataset) for c in todo
+        delayed(_worker_cell)(c, seeds, str(out_dir), options, 1, dataset, suite)
+        for c in todo
     )

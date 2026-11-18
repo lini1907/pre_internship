@@ -3,9 +3,16 @@
     python run_pipeline.py                 # download (if missing) -> raw -> DQ raw -> staging
                                            # -> DQ staging -> mart -> DQ mart -> KPI -> export
     python run_pipeline.py --skip-download --no-export
+    python run_pipeline.py --suite extended --accept   # v1.1: C21-C24, then store this
+                                                       # load as the reference snapshot
 
 Writes warehouse/olist.duckdb, results/stage_a/{dq_results,kpis_clean}.csv and run_meta.json.
-Exits 1 if a mart check fails, unless --allow-fail.
+The raw data contracts (contracts/*.yaml) are checked first; the run stops on a violation
+(--no-contracts skips them). With --suite extended the core results are unchanged and
+C21-C24 are added; C22-C24 compare with warehouse/reference/ (the last load accepted with
+--accept) and are reported as skipped when there is none. --suite extended writes its
+results to results/stage_a/dq_results_extended.csv, so dq_results.csv stays the core
+baseline. Exits 1 if a mart check fails, unless --allow-fail.
 """
 
 from __future__ import annotations
@@ -26,11 +33,24 @@ import pandas as pd  # noqa: E402
 
 from dqk import RESULTS_DIR, __version__  # noqa: E402
 from dqk.config import KPI_LOCK, check_lock  # noqa: E402
-from dqk.dq import dq_score, run_dq_checks, write_catalogue  # noqa: E402
+from dqk.contracts import ContractError, enforce  # noqa: E402
+from dqk.dq import (  # noqa: E402
+    dq_score,
+    load_dq_config,
+    run_dq_checks,
+    write_catalogue,
+)
 from dqk.export import export_all  # noqa: E402
 from dqk.io import OLIST_DIR, ensure_olist, verify_manifest  # noqa: E402
 from dqk.kpis import compute_kpis  # noqa: E402
-from dqk.pipeline import build_mart_from_staging, build_staging, load_raw, write_schema  # noqa: E402
+from dqk.pipeline import (  # noqa: E402
+    build_mart_from_staging,
+    build_staging,
+    load_raw,
+    load_reference,
+    save_reference,
+    write_schema,
+)
 
 WAREHOUSE = ROOT / "warehouse" / "olist.duckdb"
 OUT = RESULTS_DIR / "stage_a"
@@ -72,6 +92,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--skip-download", action="store_true", help="use the files already in data/")
     ap.add_argument("--no-export", action="store_true", help="do not write exports/")
     ap.add_argument("--allow-fail", action="store_true", help="exit 0 even if a mart check fails")
+    ap.add_argument("--suite", choices=["core", "extended"], default="core")
+    ap.add_argument(
+        "--accept", action="store_true", help="store this mart as the reference snapshot"
+    )
+    ap.add_argument("--no-contracts", action="store_true", help="skip the raw data contracts")
     args = ap.parse_args(argv)
 
     t0 = time.perf_counter()
@@ -80,18 +105,34 @@ def main(argv: list[str] | None = None) -> int:
     else:
         ensure_olist()
     raw = load_raw(OLIST_DIR)
+    if not args.no_contracts:
+        try:
+            enforce(raw)
+        except ContractError as e:
+            print(f"Load stopped by the raw data contracts: {e}", file=sys.stderr)
+            return 2
     dq = [run_dq_checks(raw, "raw")]
     staging = build_staging(raw)
     dq.append(run_dq_checks(staging, "staging"))
     mart = build_mart_from_staging(staging)
     dq.append(run_dq_checks(mart.as_tables(), "mart"))
     dq = pd.concat(dq, ignore_index=True)
+    dq_ext = None
+    if args.suite == "extended":
+        ref = load_reference()
+        if ref is None:
+            print("No reference snapshot yet: C22-C24 skipped (run once with --accept)")
+        r = run_dq_checks(mart.as_tables(), "mart", load_dq_config(suite="extended"), ref)
+        dq_ext = r[r["check_id"] > "C20"]
     kpis = compute_kpis(mart)
 
     OUT.mkdir(parents=True, exist_ok=True)
     dq.to_csv(OUT / "dq_results.csv", index=False)
     kpis.to_csv(OUT / "kpis_clean.csv", index=False)
     write_catalogue(OUT / "dq_results.csv")
+    if dq_ext is not None:
+        dq_ext.to_csv(OUT / "dq_results_extended.csv", index=False)
+        dq = pd.concat([dq, dq_ext], ignore_index=True)
 
     WAREHOUSE.parent.mkdir(parents=True, exist_ok=True)
     with duckdb.connect(str(WAREHOUSE)) as con:
@@ -137,6 +178,12 @@ def main(argv: list[str] | None = None) -> int:
     if len(mart_fail) and not args.allow_fail:
         print("Mart check(s) failed: " + ", ".join(mart_fail["check_id"]), file=sys.stderr)
         return 1
+    if args.accept:
+        if len(mart_fail):
+            print("Not accepted: a mart check failed", file=sys.stderr)
+            return 1
+        saved = save_reference(mart)
+        print(f"Accepted as reference: {', '.join(p.name for p in saved)}")
     return 0
 
 

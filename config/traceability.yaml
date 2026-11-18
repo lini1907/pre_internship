@@ -1,0 +1,23 @@
+# KPI -> checks that guard its inputs. Copied from Table 3.7 of the Part 2 report
+# (designed in week A1, before any experiment; "Source: author's design"). Used by the
+# KPI-weighted DQ score variants of RQ2 (code plan v1.1, N2). Do not tune after the fact.
+# Note: no core check guards the customer key of K9-K10 (C01 tests order and item keys);
+# C21 of the extended suite (v1.1) was added for that gap and is not listed here.
+version: 1
+source: Part 2 report, Table 3.7 (Traceability between KPIs and checks)
+kpis:
+  K1: [C01, C05, C06, C10, C11, C18, C19, C20]
+  K2: [C01, C05, C06, C10, C11, C18, C19, C20]
+  K3: [C01, C05, C06, C10, C11, C18, C19, C20]
+  K4: [C11, C12, C18]
+  K5: [C03, C15, C16, C17]
+  K6: [C03, C15, C16, C17]
+  K7: [C04, C07, C13]
+  K8: [C04, C07, C13]
+  K9: [C01, C05, C14]
+  K10: [C01, C05, C14]
+  K11: [C02, C08, C11]
+  K12: [C09, C11]
+  K13: [C14, C11]
+  K14: [C11, C17, C19, C20]
+  K15: [C02, C04, C08, C13]

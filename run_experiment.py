@@ -65,6 +65,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--resume", action="store_true", help="skip cells that already have output")
     ap.add_argument("--out", type=Path, help="output folder (default results/runs/<grid name>)")
     ap.add_argument("--allow-spec-change", action="store_true")
+    ap.add_argument(
+        "--only", action="append", help="run only this scenario of a scenarios file (repeatable)"
+    )
     args = ap.parse_args(argv)
 
     changed = check_lock()
@@ -73,6 +76,13 @@ def main(argv: list[str] | None = None) -> int:
         print("  " + "\n  ".join(changed))
         return 1
     grids = load_grids(args.grid)
+    if args.only:
+        names = {g.name.split("/", 1)[-1]: g for g in grids}
+        unknown = [s for s in args.only if s not in names]
+        if unknown:
+            print(f"unknown scenario(s): {unknown}; known: {sorted(names)}")
+            return 2
+        grids = [names[s] for s in args.only]
     for ds in {g.dataset for g in grids}:
         warehouse = dataset_setup(ds)[0]
         if not warehouse.exists():
@@ -105,6 +115,7 @@ def main(argv: list[str] | None = None) -> int:
             resume=args.resume,
             options=grid.baseline,
             dataset=grid.dataset,
+            suite=grid.dq_suite,
         )
         seconds = time.perf_counter() - t
 
@@ -115,6 +126,7 @@ def main(argv: list[str] | None = None) -> int:
             "grid": str(args.grid),
             "grid_name": grid.name,
             "dataset": grid.dataset,
+            "dq_suite": grid.dq_suite,
             "baseline": grid.baseline.model_dump(),
             "cells": [c.cell_id for c in cells],
             "n_seeds": len(seeds),

@@ -1,0 +1,30 @@
+version: 2
+
+sources:
+  - name: raw
+    description: >
+      Olist CSV files as loaded by run_pipeline.py into warehouse/olist.duckdb, schema raw
+      (every column VARCHAR, values as in the source). Attached read-only as database src.
+    database: src
+    schema: raw
+    tables:
+      - name: orders
+        columns:
+          - name: order_id
+            data_tests: [not_null]
+      - name: order_items
+        columns:
+          - name: order_id
+            data_tests: [not_null]
+      - name: order_payments
+      - name: order_reviews
+      - name: customers
+        columns:
+          - name: customer_id
+            data_tests: [not_null, unique]
+      - name: sellers
+      - name: products
+        columns:
+          - name: product_id
+            data_tests: [not_null, unique]
+      - name: product_category_name_translation

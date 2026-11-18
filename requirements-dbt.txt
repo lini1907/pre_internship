@@ -1,0 +1,6 @@
+# Optional: dbt for the staging and mart layers (code plan v1.1, M1).
+# Install in its own venv so the core pipeline keeps requirements.txt:
+#   python -m venv .venv-dbt && .venv-dbt/Scripts/pip install -r requirements-dbt.txt
+dbt-core==1.12.7
+dbt-duckdb==1.11.1
+duckdb==2.0.0

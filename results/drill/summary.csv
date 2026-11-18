@@ -1,0 +1,5 @@
+scenario,units,n_units,gmv_change,orders_change,aov_change,top10_categories_changed,top10_sellers_changed,worst_category_changed,n_material_kpis_1pct,core_checks_reacting,extended_checks_reacting,detected_core,detected_ext,contract_blocked,contract_messages
+double_load,orders purchased 2018-05-07 .. 2018-05-13,1987,0.06591173293483954,0.0,0.06591173293483954,False,True,False,4.0,"C05 fail, C06 fail, C07 fail, C18 fail, C19 warn, C20 warn",none,True,True,False,
+price_in_cents,items of seller 955fee92... (rank 10 by GMV),1499,0.9901985756675922,0.0,0.9901985756675922,True,True,False,7.0,C18 fail,C24 warn,True,True,False,
+category_migration,3% of products in bed_bath_table,91,0.0,0.0,0.0,False,False,False,0.0,none,C22 warn,False,True,False,
+schema_drift,order_items.price renamed to unit_price in the source file,1,,,,,,,,not reached (load stopped),not reached (load stopped),,,True,[error] olist-order-items: order_items.price missing_column - column absent | [warning] olist-order-items: order_items.unit_price extra_column - not in the contract

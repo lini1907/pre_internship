@@ -1,0 +1,15 @@
+# Writes warehouse/olist_dbt.duckdb (a separate file: warehouse/olist.duckdb is never
+# written). The pipeline's raw schema is attached read-only as the source database.
+# Paths are relative to the dbt/ folder: run dbt from there with --profiles-dir .
+olist_dq:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      # DBT_DUCKDB_PATH lets `python -m dqk.drill --dbt` run the tests on a drill mart.
+      path: "{{ env_var('DBT_DUCKDB_PATH', '../warehouse/olist_dbt.duckdb') }}"
+      threads: 4
+      attach:
+        - path: ../warehouse/olist.duckdb
+          alias: src
+          read_only: true

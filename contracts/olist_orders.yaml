@@ -1,0 +1,39 @@
+# Data contract for the raw orders file (code plan v1.1, M3).
+# Structure follows the spirit of the Open Data Contract Standard (ODCS v3: schema ->
+# properties with logicalType / required / primaryKey, quality, slaProperties); it has
+# not been validated against the ODCS JSON schema, so it does not claim conformance.
+# Enforced by src/dqk/contracts.py at the start of run_pipeline.py.
+apiVersion: v3.0.0
+kind: DataContract
+id: olist-orders
+name: Olist orders (raw)
+version: 1.0.0
+status: active
+owner: Olist order management (source system)
+consumer: analytics team (KPI dashboard)
+description: One row per order, as exported by the order management system. All values
+  arrive as text; staging casts them (TRY_CAST).
+source_file: olist_orders_dataset.csv
+schema:
+  - name: orders
+    physicalName: raw.orders
+    properties:
+      - {name: order_id, logicalType: string, required: true, primaryKey: true}
+      - {name: customer_id, logicalType: string, required: true}
+      - {name: order_status, logicalType: string, required: true}
+      - {name: order_purchase_timestamp, logicalType: timestamp, required: true}
+      - {name: order_approved_at, logicalType: timestamp, required: false}
+      - {name: order_delivered_carrier_date, logicalType: timestamp, required: false}
+      - {name: order_delivered_customer_date, logicalType: timestamp, required: false}
+      - {name: order_estimated_delivery_date, logicalType: timestamp, required: true}
+quality:
+  # Checked downstream by the DQ catalogue (docs/dq_catalogue.md).
+  - {check: C01, description: order_id not null}
+  - {check: C05, description: order_id unique}
+  - {check: C15, description: approved after purchase}
+  - {check: C16, description: delivered after purchase}
+  - {check: C17, description: timestamps within the data period}
+  - {check: C19, description: row count within 1 % / 5 % of the previous load}
+slaProperties:
+  - {property: frequency, value: daily}
+  - {property: max_unparseable_share, value: 0.001}

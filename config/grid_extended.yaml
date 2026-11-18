@@ -1,0 +1,75 @@
+# Extended-suite grid (code plan v1.1, N1 RQ4 and N3 low rates).
+#
+# Same seeds as the main and retail grids (0 .. 199), so every cell that also exists there
+# shares its random numbers: injections are identical and runs compare pair by pair.
+# The extended suite (C01-C24) is run with the clean mart as the reference of C22-C24;
+# results/runs/extended/<scenario>/<cell>.dq.parquet keeps every check's status, so both
+#   detected_core = any of C01-C20 worsened   and   detected_ext = any of C01-C24 worsened
+# come from the same runs. Thresholds of C23/C24 were frozen before this grid was run.
+#
+# Run (Online Retail II needs few workers, RAM):
+#   python run_experiment.py --grid config/grid_extended.yaml --only olist_ext --only olist_lowrate --workers 8 --resume
+#   python run_experiment.py --grid config/grid_extended.yaml --only retail_ext --workers 3 --resume
+
+name: extended
+rates: [0.01, 0.02, 0.05, 0.10, 0.20]
+n_seeds: 200
+dq_suite: extended
+
+scenarios:
+  - name: olist_ext                     # 25 cells
+    dataset: olist
+    errors:
+      - code: E6
+        variant: category_reassign
+        mechanisms:
+          MCAR: {}
+          MAR: {by: category, groups: [bed_bath_table, furniture_decor], weight: 5}
+      - code: E6
+        variant: category_spelling
+        rates: [0.05, 0.10]
+        mechanisms:
+          MCAR: {}
+      - code: E5
+        variant: price_x100
+        mechanisms:
+          MCAR: {}
+          MNAR: {by_value: price, strength: 1.0, log: true}
+      - code: E5
+        variant: price_div100
+        rates: [0.05, 0.10]
+        mechanisms:
+          MCAR: {}
+      - code: E4                        # control: silent and harmless in the core suite
+        variant: tz_shift_3h
+        rates: [0.05]
+        mechanisms:
+          MCAR: {}
+
+  - name: retail_ext                    # 15 cells
+    dataset: retail
+    errors:
+      - code: E5
+        variant: price_x100
+        mechanisms:
+          MCAR: {}
+          MNAR: {by_value: price, strength: 1.0, log: true}
+      - code: E3
+        variant: missing_customer_id
+        mechanisms:
+          MCAR: {}
+
+  - name: olist_lowrate                 # 12 cells (N3)
+    dataset: olist
+    rates: [0.001, 0.0025, 0.005]
+    errors:
+      - code: E6
+        variant: category_reassign
+        mechanisms:
+          MCAR: {}
+          MAR: {by: category, groups: [bed_bath_table, furniture_decor], weight: 5}
+      - code: E5
+        variant: price_x100
+        mechanisms:
+          MCAR: {}
+          MNAR: {by_value: price, strength: 1.0, log: true}

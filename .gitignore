@@ -13,3 +13,10 @@ exports/
 powerbi/**/.pbi/
 powerbi/**/diagramLayout.json
 *.egg-info/
+.venv-dbt/
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+logs/
+dbt/.user.yml
+exports_drill/

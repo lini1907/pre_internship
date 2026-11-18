@@ -1,0 +1,130 @@
+version: 2
+
+# Generic dbt tests that mirror the core checks of config/dq_checks.yaml (mapping:
+# docs/dbt.md). Where a check tolerates a residual level on clean data (C02, C03, C07),
+# warn_if / error_if are the check's warn / fail shares turned into row counts on the
+# clean load. C06, C11, C12, C15-C18 are singular tests in dbt/tests/. C19-C20 (volume
+# vs the reference load) and C21-C24 (v1.1) have no generic dbt equivalent.
+
+models:
+  - name: stg_orders
+    description: One row per order_id; timestamps cast with TRY_CAST.
+    columns:
+      - name: order_id
+        data_tests: [not_null, unique]
+  - name: stg_order_items
+    columns:
+      - name: order_id
+        data_tests: [not_null]
+  - name: stg_order_payments
+  - name: stg_order_reviews
+  - name: stg_customers
+    columns:
+      - name: customer_id
+        data_tests: [not_null, unique]
+  - name: stg_sellers
+    columns:
+      - name: seller_id
+        data_tests: [not_null, unique]
+  - name: stg_products
+    columns:
+      - name: product_id
+        data_tests: [not_null, unique]
+
+  - name: fact_orders
+    description: One row per order, any status (grain of K2, K5-K10).
+    columns:
+      - name: order_id
+        description: C01, C05
+        data_tests: [not_null, unique]
+      - name: delivered_customer_ts
+        description: C03 delivered order has a customer delivery date (8 missing on clean data)
+        data_tests:
+          - not_null:
+              config:
+                where: "status = 'delivered'"
+                warn_if: "> 0"
+                error_if: "> 96"
+      - name: review_score
+        description: C04 review has a score; C13 score in 1..5
+        data_tests:
+          - not_null:
+              config:
+                where: "review_id IS NOT NULL"
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5]
+                quote: false
+      - name: review_id
+        description: C07 review_id unique (Olist reuses review ids; 1.2 % on clean data)
+        data_tests:
+          - unique:
+              config:
+                where: "review_id IS NOT NULL"
+                warn_if: "> 1973"
+                error_if: "> 4933"
+      - name: customer_unique_id
+        description: C21 (v1.1) customer key present
+        data_tests: [not_null]
+
+  - name: fact_order_items
+    description: One row per (order_id, order_item_id).
+    columns:
+      - name: order_id
+        description: C01, C10
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fact_orders')
+                field: order_id
+      - name: product_id
+        description: C01, C08
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_product')
+                field: product_id
+      - name: seller_id
+        description: C01, C09
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_seller')
+                field: seller_id
+
+  - name: dim_customer
+    columns:
+      - name: customer_unique_id
+        data_tests: [not_null, unique]
+      - name: state
+        description: C14
+        data_tests: &states
+          - accepted_values:
+              arguments:
+                values: [AC, AL, AM, AP, BA, CE, DF, ES, GO, MA, MG, MS, MT, PA, PB, PE, PI,
+                         PR, RJ, RN, RO, RR, RS, SC, SE, SP, TO]
+  - name: dim_seller
+    columns:
+      - name: seller_id
+        data_tests: [not_null, unique]
+      - name: state
+        description: C14
+        data_tests: *states
+  - name: dim_product
+    columns:
+      - name: product_id
+        data_tests: [not_null, unique]
+      - name: category_en
+        description: C02 product has a translated category (1.9 % missing on clean data)
+        data_tests:
+          - not_null:
+              config:
+                warn_if: "> 659"
+                error_if: "> 1647"
+  - name: dim_date
+    columns:
+      - name: date_key
+        data_tests: [not_null, unique]
