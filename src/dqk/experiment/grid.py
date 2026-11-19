@@ -46,11 +46,12 @@ class GridConfig(BaseModel):
     """dataset: 'olist' (warehouse/olist.duckdb) or 'retail' (Online Retail II,
     warehouse/retail.duckdb, KPI and DQ subsets of src/dqk/retail/kpi_map.yaml).
     dq_suite: 'core' (C01-C20) or 'extended' (also C21-C24, with the clean mart as the
-    reference of C22-C24; config/dq_checks_extended.yaml)."""
+    reference of C22-C24; config/dq_checks_extended.yaml) or 'ml' (extended plus the ML
+    detectors M01-M03 of dqk.ml.detectors, code plan v1.2)."""
 
     name: str
     dataset: Literal["olist", "retail"] = "olist"
-    dq_suite: Literal["core", "extended"] = "core"
+    dq_suite: Literal["core", "extended", "ml"] = "core"
     rates: list[float]
     n_seeds: int
     errors: list[ErrorEntry]

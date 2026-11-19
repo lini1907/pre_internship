@@ -34,7 +34,9 @@ def dataset_setup(
 ) -> tuple[Path, KpiSpec, DqConfig]:
     """(warehouse file, KPI spec, DQ config) of a dataset. Online Retail II uses the
     subsets of src/dqk/retail/kpi_map.yaml on the same KPI and DQ SQL files.
-    suite="extended" adds C21-C24 (v1.1)."""
+    suite="extended" adds C21-C24 (v1.1); suite="ml" runs the extended SQL checks here and
+    adds the ML detectors in make_baseline / run_once (v1.2)."""
+    suite = "extended" if suite == "ml" else suite
     if dataset == "olist":
         return WAREHOUSE, load_kpi_spec(), load_dq_config(suite=suite)
     if dataset == "retail":
@@ -58,6 +60,7 @@ class Baseline:
     dq_config: DqConfig
     options: BaselineOptions | None = None
     reference: Mart | None = None
+    ml: object | None = None  # dqk.ml.detectors.MlBundle in the "ml" suite
 
     def ref_tables(self):
         return self.reference.as_tables() if self.reference is not None else None
@@ -123,10 +126,24 @@ def make_baseline(
         kpi_spec=spec,
         dq_config=cfg,
         options=options,
-        reference=mart if suite == "extended" else None,
+        reference=mart if suite in ("extended", "ml") else None,
     )
-    base.dq = run_dq_checks(mart.as_tables(), "mart", cfg, reference=base.ref_tables())
+    if suite == "ml":
+        from dqk.ml.detectors import load_bundle
+
+        base.ml = load_bundle(dataset)
+    base.dq = _checks(base, mart)
     return base
+
+
+def _checks(base: Baseline, mart: Mart) -> pd.DataFrame:
+    """SQL checks, plus the ML detectors when the baseline carries a bundle."""
+    dq = run_dq_checks(mart.as_tables(), "mart", base.dq_config, reference=base.ref_tables())
+    if base.ml is not None:
+        from dqk.ml.detectors import run_ml_checks
+
+        dq = pd.concat([dq, run_ml_checks(mart, base.ml)], ignore_index=True)
+    return dq
 
 
 def run_once(
@@ -136,9 +153,7 @@ def run_once(
     corrupted, log = inject_errors(base.mart, cell.spec, seed, units)
     t1 = time.perf_counter()
     kpis = base.compute_kpis(corrupted)
-    dq = run_dq_checks(
-        corrupted.as_tables(), "mart", base.dq_config, reference=base.ref_tables()
-    )
+    dq = _checks(base, corrupted)
     t2 = time.perf_counter()
     km = kpi_measures(base.kpis, kpis, base.kpi_spec)
     dm = dq_measures(base.dq, dq)

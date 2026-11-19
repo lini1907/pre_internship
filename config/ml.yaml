@@ -20,3 +20,24 @@ rq5:
     logreg: {C: 1.0, max_iter: 2000}
     rf: {n_estimators: 500, min_samples_leaf: 5, n_jobs: -1}
     gb: {max_iter: 300, learning_rate: 0.05, max_leaf_nodes: 15, min_samples_leaf: 20}
+
+rq6:
+  seed: 20261120
+  n_folds: 5                  # cross-fitting by product (Olist product_id, Retail StockCode)
+  # Item-level rules, fixed by design from clean out-of-fold scores (code plan 3.4):
+  m01_tau_quantile: 0.01      # flag a product if p(observed category) < this quantile of
+                              # p(true category) on clean data; unseen labels are flagged too
+  m02_k: 5                    # flag a line if |log price - prediction| > k x MAD of clean residuals
+  m03_quantile: 0.001         # flag a line if its IsolationForest score is below this quantile
+  # M01 model chosen on clean out-of-fold top-1 accuracy only (prototype on fold 0, before
+  # any injected run): HistGB 73-class 0.45, RF 0.50, RF + seller profile 0.75.
+  models:
+    m01: {n_estimators: 300, min_samples_leaf: 3, n_jobs: -1}
+    m02: {max_iter: 300, learning_rate: 0.05, max_leaf_nodes: 31, min_samples_leaf: 20,
+          early_stopping: false}
+    m03: {n_estimators: 200, max_samples: 256}
+  retail_text_dims: 20        # description -> HashingVectorizer -> TruncatedSVD
+  max_train_rows: 300000      # subsample of training lines (Online Retail II has 767k)
+  # Run-level warn / fail thresholds on fail_share (dqk.ml.calibrate, split halves of clean
+  # data, 99th percentile; fail = 2 x warn). Filled in before the ML grid is run.
+  thresholds: {}

@@ -1,0 +1,24 @@
+version: 1
+note: Run-level warn/fail thresholds of M01-M03, from 200 clean split halves (99th
+  percentile, fail = 2 x warn). Frozen before the ML grid was run; do not change after
+  looking at injected runs.
+frozen_at: '2026-11-19T02:28:17'
+code_commit: 811b83e
+thresholds:
+  olist:
+    M01:
+    - 0.0112
+    - 0.0224
+    M02:
+    - 0.0174
+    - 0.0348
+    M03:
+    - 0.0013
+    - 0.0026
+  retail:
+    M02:
+    - 0.0102
+    - 0.0204
+    M03:
+    - 0.0012
+    - 0.0024
