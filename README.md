@@ -4,12 +4,31 @@
 An analytics pipeline on the [Olist Brazilian e-commerce dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
 (Stage A) and a controlled experiment on how injected data errors distort business KPIs (Stage B).
 
-Status: **Stage A and Stage B done (tag `v1.0-paper`)** — pipeline, 15 KPIs, 20 DQ checks and
+## Reports and code versions
+
+Each report was written against a fixed version of this repository. Check out the tag of the
+report you are reading to get exactly the code and results it describes.
+
+| Report | Covers | Tag | Branch |
+|---|---|---|---|
+| Pre-internship report, Part 2 | Stage A + Stage B + v1.1: pipeline, dashboard, error injection, RQ1–RQ4, drill, dbt, CI | `part2-report` | `master` |
+| Advanced report | Everything in Part 2, plus RQ5 (learned KPI-risk score) and RQ6 (ML detectors M01–M03) | `advanced-report` | `ml-v1.2` |
+
+```bash
+git checkout part2-report          # or advanced-report
+```
+
+`v1.0-advanced` is the older tag cited in the first draft of the advanced report: Stage A and
+Stage B only (RQ1–RQ3), before v1.1. It is kept so that citation still resolves.
+
+## Status
+
+**v1.0: Stage A and Stage B done (tag `v1.0-advanced`)** — pipeline, 15 KPIs, 20 DQ checks and
 dashboard (Stage A); error injection E1–E6, main and robustness grids, Online Retail II replication,
 RQ1–RQ3 statistics, tables and figures (Stage B). Every table and figure of the paper is rebuilt by
 `python -m dqk.analysis.make_all`.
 
-**v1.1 (branch `upgrade-v1.1`)** adds, without changing any v1.0 number: KPI-aware checks
+**v1.1 (on `master`)** adds, without changing any v1.0 number: KPI-aware checks
 C21–C24 with thresholds calibrated on clean data, an extended experiment grid (RQ4, low error
 rates), KPI-weighted DQ score variants, an incident drill, raw data contracts, a dbt project for
 staging and mart, business analyses (cohorts, segments, Pareto, late-delivery what-if) and CI.
@@ -22,7 +41,7 @@ See [v1.1](#v11-extended-checks-drill-dbt-ci).
 Requires Python 3.12 and internet access to kaggle.com on the first run.
 
 ```bash
-git clone https://github.com/lini1907/-internship-.git olist-dq-kpi && cd olist-dq-kpi
+git clone https://github.com/lini1907/pre_internship.git olist-dq-kpi && cd olist-dq-kpi
 python -m venv .venv
 .venv\Scripts\activate              # Windows cmd / PowerShell
 # source .venv/Scripts/activate     # Windows Git Bash
