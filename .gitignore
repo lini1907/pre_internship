@@ -20,4 +20,5 @@ dbt/dbt_packages/
 logs/
 dbt/.user.yml
 exports_drill/
+# local documentation (not published)
 docs/
